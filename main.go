@@ -43,7 +43,7 @@ func main() {
 	location := widget.NewLabel("")
 
 	entry := newNumericalEntry()
-	// entry.SetPlaceHolder("Max number on Y axis")
+	entry.SetPlaceHolder("Max number on Y axis")
 
 	// image := canvas.NewImageFromResource(theme.FyneLogo())
 
