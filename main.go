@@ -21,7 +21,7 @@ import (
 )
 
 var topWindow fyne.Window
-var maxHeight int
+var maxYRes int
 
 func main() {
 
@@ -34,8 +34,8 @@ func main() {
 	for i := 0; i < screenAmount; i++ {
 		screenBounds := screenshot.GetDisplayBounds(i)
 		height := screenBounds.Max.Y - screenBounds.Min.Y
-		if height > maxHeight {
-			maxHeight = height
+		if height > maxYRes {
+			maxYRes = height
 		}
 	}
 

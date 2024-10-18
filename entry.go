@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	// "fmt"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -10,7 +10,7 @@ import (
 )
 
 var confirmed bool
-var yAxisMax int
+var inputYMax int
 
 type numericalEntry struct {
 	widget.Entry
@@ -37,8 +37,7 @@ func (e *numericalEntry) TypedRune(r rune) {
 func (e *numericalEntry) KeyUp(event *fyne.KeyEvent) {
 	switch event.Name {
 	case fyne.KeyReturn:
-		fmt.Println(e.yAxis)
-		yAxisMax = e.yAxis
+		inputYMax = e.yAxis
 		confirmed = true
 	case fyne.KeyBackspace:
 		text, err := strconv.Atoi(e.Entry.Text)
