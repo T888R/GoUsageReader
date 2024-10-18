@@ -9,6 +9,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+var confirmed bool
+var yAxisMax int
+
 type numericalEntry struct {
 	widget.Entry
 	yAxis int
@@ -28,27 +31,21 @@ func (e *numericalEntry) TypedRune(r rune) {
 			return
 		}
 		e.yAxis = text
-		fmt.Println(e.yAxis)
 	}
 }
-
-/* func (e *numericalEntry) TypedKey(event *fyne.KeyEvent) {
-	if event.Name == fyne.KeyReturn {
-		fmt.Println(e.yAxis)
-	}
-} */
 
 func (e *numericalEntry) KeyUp(event *fyne.KeyEvent) {
 	switch event.Name {
 	case fyne.KeyReturn:
 		fmt.Println(e.yAxis)
+		yAxisMax = e.yAxis
+		confirmed = true
 	case fyne.KeyBackspace:
 		text, err := strconv.Atoi(e.Entry.Text)
 		if err != nil {
 			return
 		}
 		e.yAxis = text
-		fmt.Println(e.yAxis)
 	}
 }
 
