@@ -36,45 +36,32 @@ func updateLocation(location *widget.Label) {
 			// set the pixel location of the origin of the graph
 			lowerBound = yAxisLocation
 		case 2:
-			fmt.Println("January")
 			// run the calculation of what resulting usage based on maxgraph and the origin
 			calcGraph(yAxisLocation, "January")
 		case 3:
-			fmt.Println("February")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "February")
 		case 4:
-			fmt.Println("March")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "March")
 		case 5:
-			fmt.Println("April")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "April")
 		case 6:
-			fmt.Println("May")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "May")
 		case 7:
-			fmt.Println("June")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "June")
 		case 8:
-			fmt.Println("July")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "July")
 		case 9:
-			fmt.Println("August")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "August")
 		case 10:
-			fmt.Println("September")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "September")
 		case 11:
-			fmt.Println("October")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "October")
 		case 12:
-			fmt.Println("November")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "November")
 		case 13:
-			fmt.Println("December")
-			calcGraph(yAxisLocation, "January")
+			calcGraph(yAxisLocation, "December")
 		default:
 			fmt.Println("Completed")
-			calcGraph(yAxisLocation, "January")
 		}
 		clickCount++
 	}
@@ -82,7 +69,7 @@ func updateLocation(location *widget.Label) {
 	// fmt.Println(clickCount)
 }
 
-func calcGraph(ypos int, month string) {
+func calcGraph(ypos int, month string) (int, string) {
 	boundary = upperBound - lowerBound
 
 	var usage float32
@@ -95,11 +82,14 @@ func calcGraph(ypos int, month string) {
 	// usage = float32(inputYMax) * (float32(ypos) / float32(boundary))
 	usage = (float32(ypos) - float32(lowerBound)) / (float32(upperBound) - float32(lowerBound))
 	correctedUsage = float32(inputYMax) * usage
+	if correctedUsage < 0 {
+		correctedUsage = 0
+	}
 	// fmt.Println(usageMult)
 	// fmt.Println(float32(ypos) / float32(maxYRes))
-	fmt.Printf("Multiplier %f\n", usage)
-	fmt.Printf("Cursor Y postion %d\n", ypos)
-	fmt.Printf("Corrected usage %f\n", correctedUsage)
+	// fmt.Printf("Multiplier %f\n", usage)
+	// fmt.Printf("Cursor Y postion %d\n", ypos)
+	fmt.Printf("Corrected usage %d for %s\n", int(correctedUsage), month)
 	// fmt.Println(fcorrectedUsage)
-	// return ypos, month
+	return int(correctedUsage), month
 }
