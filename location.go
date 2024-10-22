@@ -29,6 +29,42 @@ var november string
 var december string
 
 var months string
+var description string
+
+func updateDescription(desc *widget.Label) {
+	switch clickCount {
+	case 0:
+		desc.SetText("Input y axis, hit enter, and click the top of the graph")
+	case 1:
+		desc.SetText("Maximum set")
+	case 2:
+		desc.SetText("Origin set")
+	case 3:
+		desc.SetText("January set")
+	case 4:
+		desc.SetText("February set")
+	case 5:
+		desc.SetText("March set")
+	case 6:
+		desc.SetText("April set")
+	case 7:
+		desc.SetText("May set")
+	case 8:
+		desc.SetText("June set")
+	case 9:
+		desc.SetText("July set")
+	case 10:
+		desc.SetText("August set")
+	case 11:
+		desc.SetText("September set")
+	case 12:
+		desc.SetText("October set")
+	case 13:
+		desc.SetText("November set")
+	default:
+		desc.SetText("Usage calculation completed")
+	}
+}
 
 func updateLocation(location *widget.Label) {
 	// func updateLocation() {
@@ -50,7 +86,7 @@ func updateLocation(location *widget.Label) {
 			// set the pixel location of the origin of the graph
 			lowerBound = yAxisLocation
 
-		// run the calculation on resulting usage based on maxgraph and the origin
+		// run the calculation and format a string based on resulting usage based on maxgraph and the origin
 		case 2:
 			january = calcGraph(yAxisLocation, "January")
 			months = fmt.Sprint(january)
@@ -121,7 +157,7 @@ func calcGraph(ypos int, month string) string {
 	// min max calculation
 	usage = (float32(ypos) - float32(lowerBound)) / (float32(upperBound) - float32(lowerBound))
 
-	// take min max and times it by the inputted max value
+	// take min max and times it by the inputted max value and add 1 to round
 	correctedUsage = float32(inputYMax)*usage + 1
 
 	// ensure no negative numbers
@@ -129,8 +165,6 @@ func calcGraph(ypos int, month string) string {
 		correctedUsage = 0
 	}
 
-	// fmt.Printf("Corrected usage %d for %s\n", int(correctedUsage), month)
-	// monthStr := fmt.Sprintln("%d: %s\n", int(correctedUsage), month)
 	monthStr := fmt.Sprintln(month, int(correctedUsage))
 	fmt.Printf(monthStr)
 

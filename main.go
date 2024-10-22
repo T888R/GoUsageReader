@@ -17,7 +17,6 @@ func main() {
 
 	app := app.New()
 	window := app.NewWindow("Usage Reader")
-	// topWindow = window
 
 	screenAmount := screenshot.NumActiveDisplays()
 
@@ -36,7 +35,7 @@ Please type the highest number on the y axis and click Enter`)
 	entry := newNumericalEntry()
 	entry.SetPlaceHolder("Max number on Y axis")
 
-	info := widget.NewLabel("")
+	info := widget.NewLabel("Input y axis, hit enter, and click the top of the graph")
 	info.Wrapping = fyne.TextWrapWord
 
 	readings := widget.NewLabel(months)
@@ -48,6 +47,7 @@ Please type the highest number on the y axis and click Enter`)
 	go func() {
 		for range time.Tick(time.Millisecond) {
 			updateLocation(readings)
+			updateDescription(info)
 		}
 	}()
 
