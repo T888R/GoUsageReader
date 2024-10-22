@@ -14,16 +14,30 @@ var clickCount int
 var yAxisLocation int
 var upperBound int
 var lowerBound int
-var boundary int
+
+var january string
+var february string
+var march string
+var april string
+var may string
+var june string
+var july string
+var august string
+var september string
+var october string
+var november string
+var december string
+
+var months string
 
 func updateLocation(location *widget.Label) {
+	// func updateLocation() {
 
 	mleft := hook.AddEvent("mleft")
 	if mleft == true && confirmed == true {
 		_, y := robotgo.Location()
 		correct := maxYRes - y
 		pos := fmt.Sprint(correct)
-		location.SetText(pos)
 		yAxisLocation, _ = strconv.Atoi(pos)
 
 		switch clickCount {
@@ -35,33 +49,59 @@ func updateLocation(location *widget.Label) {
 			fmt.Println("Origin set")
 			// set the pixel location of the origin of the graph
 			lowerBound = yAxisLocation
+
+		// run the calculation on resulting usage based on maxgraph and the origin
 		case 2:
-			// run the calculation of what resulting usage based on maxgraph and the origin
-			calcGraph(yAxisLocation, "January")
+			january = calcGraph(yAxisLocation, "January")
+			months = fmt.Sprint(january)
+			location.SetText(months)
 		case 3:
-			calcGraph(yAxisLocation, "February")
+			february = calcGraph(yAxisLocation, "February")
+			months = months + february
+			location.SetText(months)
 		case 4:
-			calcGraph(yAxisLocation, "March")
+			march = calcGraph(yAxisLocation, "March")
+			months = months + march
+			location.SetText(months)
 		case 5:
-			calcGraph(yAxisLocation, "April")
+			april = calcGraph(yAxisLocation, "April")
+			months = months + april
+			location.SetText(months)
 		case 6:
-			calcGraph(yAxisLocation, "May")
+			may = calcGraph(yAxisLocation, "May")
+			months = months + may
+			location.SetText(months)
 		case 7:
-			calcGraph(yAxisLocation, "June")
+			june = calcGraph(yAxisLocation, "June")
+			months = months + june
+			location.SetText(months)
 		case 8:
-			calcGraph(yAxisLocation, "July")
+			july = calcGraph(yAxisLocation, "July")
+			months = months + july
+			location.SetText(months)
 		case 9:
-			calcGraph(yAxisLocation, "August")
+			august = calcGraph(yAxisLocation, "August")
+			months = months + august
+			location.SetText(months)
 		case 10:
-			calcGraph(yAxisLocation, "September")
+			september = calcGraph(yAxisLocation, "September")
+			months = months + september
+			location.SetText(months)
 		case 11:
-			calcGraph(yAxisLocation, "October")
+			october = calcGraph(yAxisLocation, "October")
+			months = months + october
+			location.SetText(months)
 		case 12:
-			calcGraph(yAxisLocation, "November")
+			november = calcGraph(yAxisLocation, "November")
+			months = months + november
+			location.SetText(months)
 		case 13:
-			calcGraph(yAxisLocation, "December")
+			december = calcGraph(yAxisLocation, "December")
+			months = months + december
+			location.SetText(months)
 		default:
 			fmt.Println("Completed")
+			location.SetText(months)
 		}
 		clickCount++
 	}
@@ -69,8 +109,7 @@ func updateLocation(location *widget.Label) {
 	// fmt.Println(clickCount)
 }
 
-func calcGraph(ypos int, month string) (int, string) {
-	boundary = upperBound - lowerBound
+func calcGraph(ypos int, month string) string {
 
 	var usage float32
 	var correctedUsage float32
@@ -79,17 +118,21 @@ func calcGraph(ypos int, month string) (int, string) {
 		ypos = 0
 	}
 
-	// usage = float32(inputYMax) * (float32(ypos) / float32(boundary))
+	// min max calculation
 	usage = (float32(ypos) - float32(lowerBound)) / (float32(upperBound) - float32(lowerBound))
-	correctedUsage = float32(inputYMax) * usage
+
+	// take min max and times it by the inputted max value
+	correctedUsage = float32(inputYMax)*usage + 1
+
+	// ensure no negative numbers
 	if correctedUsage < 0 {
 		correctedUsage = 0
 	}
-	// fmt.Println(usageMult)
-	// fmt.Println(float32(ypos) / float32(maxYRes))
-	// fmt.Printf("Multiplier %f\n", usage)
-	// fmt.Printf("Cursor Y postion %d\n", ypos)
-	fmt.Printf("Corrected usage %d for %s\n", int(correctedUsage), month)
-	// fmt.Println(fcorrectedUsage)
-	return int(correctedUsage), month
+
+	// fmt.Printf("Corrected usage %d for %s\n", int(correctedUsage), month)
+	// monthStr := fmt.Sprintln("%d: %s\n", int(correctedUsage), month)
+	monthStr := fmt.Sprintln(month, int(correctedUsage))
+	fmt.Printf(monthStr)
+
+	return monthStr
 }

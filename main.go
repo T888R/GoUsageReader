@@ -1,33 +1,23 @@
 package main
 
 import (
-	// "image/color"
-	// "fmt"
 	"time"
 
-	// "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-
-	// "fyne.io/fyne/v2/canvas"
-	// "fyne.io/fyne/v2/container"
-	"github.com/kbinani/screenshot"
-
-	// "fyne.io/fyne/v2/dialog"
-	// "fyne.io/fyne/v2/layout"
-
-	// "fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+
+	"github.com/kbinani/screenshot"
 )
 
-var topWindow fyne.Window
 var maxYRes int
 
 func main() {
 
 	app := app.New()
 	window := app.NewWindow("Usage Reader")
-	topWindow = window
+	// topWindow = window
 
 	screenAmount := screenshot.NumActiveDisplays()
 
@@ -39,26 +29,29 @@ func main() {
 		}
 	}
 
-	// content := container.NewStack()
-	location := widget.NewLabel("")
+	header := widget.NewLabel(`Welcome to the new usage reader. 
+Please type the highest number on the y axis and click Enter`)
+	header.Wrapping = fyne.TextWrapWord
 
 	entry := newNumericalEntry()
 	entry.SetPlaceHolder("Max number on Y axis")
 
-	// image := canvas.NewImageFromResource(theme.FyneLogo())
+	info := widget.NewLabel("")
+	info.Wrapping = fyne.TextWrapWord
 
-	// input := widget.NewEntry()
-	// input.SetPlaceHolder("Enter text...")
+	readings := widget.NewLabel(months)
 
-	// split := container.NewHSplit(content, entry)
+	content := container.NewVBox(header, entry, info, readings)
 
-	window.SetContent(entry)
+	window.SetContent(content)
 
 	go func() {
 		for range time.Tick(time.Millisecond) {
-			updateLocation(location)
+			updateLocation(readings)
 		}
 	}()
+
+	window.Resize(fyne.NewSize(200, 600))
 
 	window.ShowAndRun()
 
