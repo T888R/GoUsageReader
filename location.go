@@ -6,8 +6,10 @@ import (
 	hook "github.com/robotn/gohook"
 
 	"fyne.io/fyne/v2/widget"
-	"github.com/go-vgo/robotgo"
+	// "fyne.io/fyne/v2/driver/desktop"
 	"strconv"
+
+	"github.com/go-vgo/robotgo"
 )
 
 var clickCount int
@@ -34,43 +36,62 @@ var description string
 func updateDescription(desc *widget.Label) {
 	switch clickCount {
 	case 0:
-		desc.SetText("Input y axis, hit enter, and click the top of the graph")
+		desc.SetText("Click the top of the graph")
 	case 1:
-		desc.SetText("Maximum set")
+		desc.SetText("Set the origin")
 	case 2:
-		desc.SetText("Origin set")
+		desc.SetText("Click January")
 	case 3:
-		desc.SetText("January set")
+		desc.SetText("Click February")
 	case 4:
-		desc.SetText("February set")
+		desc.SetText("Click March")
 	case 5:
-		desc.SetText("March set")
+		desc.SetText("Click April")
 	case 6:
-		desc.SetText("April set")
+		desc.SetText("Click May")
 	case 7:
-		desc.SetText("May set")
+		desc.SetText("Click June")
 	case 8:
-		desc.SetText("June set")
+		desc.SetText("Click July")
 	case 9:
-		desc.SetText("July set")
+		desc.SetText("Click August")
 	case 10:
-		desc.SetText("August set")
+		desc.SetText("Click September")
 	case 11:
-		desc.SetText("September set")
+		desc.SetText("Click October")
 	case 12:
-		desc.SetText("October set")
+		desc.SetText("Click November")
 	case 13:
-		desc.SetText("November set")
+		desc.SetText("Click December")
 	default:
 		desc.SetText("Usage calculation completed")
 	}
 }
 
 func updateLocation(location *widget.Label) {
-	// func updateLocation() {
+
+	// These comments are for getting cursor position with Windows API
+
+	// userDLL := syscall.NewLazyDLL("user32.dll")
+	// getWindowRectProc := userDLL.NewProc("GetCursorPos")
+
+	// type POINT struct {
+	// X, Y int32
+	// }
+	// var pt POINT
 
 	mleft := hook.AddEvent("mleft")
-	if mleft == true && confirmed == true {
+
+	if mleft && confirmed {
+
+		// _, _, eno := syscall.SyscallN(getWindowRectProc.Addr(), uintptr(unsafe.Pointer(&pt)))
+		// if eno != 0 {
+		// fmt.Println(eno)
+		// }
+
+		// correct := int32(maxYres) - int32(pt.Y)
+
+		// using robotgo to get cursor position for Linux and potentially MacOS
 		_, y := robotgo.Location()
 		correct := maxYRes - y
 		pos := fmt.Sprint(correct)
@@ -139,6 +160,7 @@ func updateLocation(location *widget.Label) {
 			fmt.Println("Completed")
 			location.SetText(months)
 		}
+		// time.Sleep(500 * time.Millisecond)
 		clickCount++
 	}
 	// fmt.Println(yAxisLocation)
@@ -158,7 +180,7 @@ func calcGraph(ypos int, month string) string {
 	usage = (float32(ypos) - float32(lowerBound)) / (float32(upperBound) - float32(lowerBound))
 
 	// take min max and times it by the inputted max value and add 1 to round
-	correctedUsage = float32(inputYMax)*usage + 1
+	correctedUsage = float32(inputYMax) * (usage * 1.01)
 
 	// ensure no negative numbers
 	if correctedUsage < 0 {
