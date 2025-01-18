@@ -36,7 +36,7 @@ var description string
 func updateDescription(desc *widget.Label) {
 	switch clickCount {
 	case 0:
-		desc.SetText("Click the top of the graph")
+		desc.SetText("Input y axis, hit enter, and click the top of the graph")
 	case 1:
 		desc.SetText("Set the origin")
 	case 2:
@@ -64,7 +64,37 @@ func updateDescription(desc *widget.Label) {
 	case 13:
 		desc.SetText("Click December")
 	default:
-		desc.SetText("Usage calculation completed")
+		desc.SetText("Usage calculation completed. Click v with January field selected to paste")
+
+		ok := hook.AddEvent("v")
+		if ok {
+			fmt.Println("pasted")
+			robotgo.KeyTap("backspace")
+			robotgo.TypeStr(january)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(february)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(march)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(april)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(may)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(june)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(july)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(august)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(september)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(october)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(november)
+			robotgo.KeyTap("tab")
+			robotgo.TypeStr(december)
+			robotgo.KeyTap("tab")
+		}
 	}
 }
 
@@ -109,52 +139,52 @@ func updateLocation(location *widget.Label) {
 
 		// run the calculation and format a string based on resulting usage based on maxgraph and the origin
 		case 2:
-			january = calcGraph(yAxisLocation, "January")
-			months = fmt.Sprint(january)
+			january = calcGraph(yAxisLocation)
+			months = fmt.Sprint("January " + january)
 			location.SetText(months)
 		case 3:
-			february = calcGraph(yAxisLocation, "February")
-			months = months + february
+			february = calcGraph(yAxisLocation)
+			months = months + ("February " + february)
 			location.SetText(months)
 		case 4:
-			march = calcGraph(yAxisLocation, "March")
-			months = months + march
+			march = calcGraph(yAxisLocation)
+			months = months + ("March " + march)
 			location.SetText(months)
 		case 5:
-			april = calcGraph(yAxisLocation, "April")
-			months = months + april
+			april = calcGraph(yAxisLocation)
+			months = months + ("April " + april)
 			location.SetText(months)
 		case 6:
-			may = calcGraph(yAxisLocation, "May")
-			months = months + may
+			may = calcGraph(yAxisLocation)
+			months = months + ("May " + may)
 			location.SetText(months)
 		case 7:
-			june = calcGraph(yAxisLocation, "June")
-			months = months + june
+			june = calcGraph(yAxisLocation)
+			months = months + ("June " + june)
 			location.SetText(months)
 		case 8:
-			july = calcGraph(yAxisLocation, "July")
-			months = months + july
+			july = calcGraph(yAxisLocation)
+			months = months + ("July " + july)
 			location.SetText(months)
 		case 9:
-			august = calcGraph(yAxisLocation, "August")
-			months = months + august
+			august = calcGraph(yAxisLocation)
+			months = months + ("August " + august)
 			location.SetText(months)
 		case 10:
-			september = calcGraph(yAxisLocation, "September")
-			months = months + september
+			september = calcGraph(yAxisLocation)
+			months = months + ("September " + september)
 			location.SetText(months)
 		case 11:
-			october = calcGraph(yAxisLocation, "October")
-			months = months + october
+			october = calcGraph(yAxisLocation)
+			months = months + ("October " + october)
 			location.SetText(months)
 		case 12:
-			november = calcGraph(yAxisLocation, "November")
-			months = months + november
+			november = calcGraph(yAxisLocation)
+			months = months + ("November " + november) 
 			location.SetText(months)
 		case 13:
-			december = calcGraph(yAxisLocation, "December")
-			months = months + december
+			december = calcGraph(yAxisLocation)
+			months = months + ("December " + december)
 			location.SetText(months)
 		default:
 			fmt.Println("Completed")
@@ -167,7 +197,7 @@ func updateLocation(location *widget.Label) {
 	// fmt.Println(clickCount)
 }
 
-func calcGraph(ypos int, month string) string {
+func calcGraph(ypos int) string {
 
 	var usage float32
 	var correctedUsage float32
@@ -187,8 +217,8 @@ func calcGraph(ypos int, month string) string {
 		correctedUsage = 0
 	}
 
-	monthStr := fmt.Sprintln(month, int(correctedUsage))
-	fmt.Printf(monthStr)
+	monthStr := fmt.Sprintln(int(correctedUsage))
+	// fmt.Printf(monthStr)
 
 	return monthStr
 }
