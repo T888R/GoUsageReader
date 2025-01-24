@@ -34,7 +34,7 @@ func main() {
 	// screenAmount := screenshot.NumActiveDisplays()
 	//
 	// for i := 0; i < screenAmount; i++ {
-	// 	screenBounds := screenshot.GetDisplayBounds(i)
+	// 	screenBounds := screenshot.GetDispl eayBounds(i)
 	// 	height := screenBounds.Max.Y - screenBounds.Min.Y
 	// 	if height > maxYRes {
 	// 		maxYRes = height
@@ -52,8 +52,13 @@ Please type the highest number on the y axis and click Enter`)
 
 	readings := widget.NewLabel(months)
 
-	content := container.NewVBox(header, entry, info, readings)
+	reset := widget.NewButton("Reset", func() {
+		resetFunc()
+	})
+
+	content := container.NewVBox(header, entry, info, readings, reset)
 	window.Resize(fyne.NewSize(100, 450))
+	window.SetFixedSize(true)
 
 	window.SetContent(content)
 

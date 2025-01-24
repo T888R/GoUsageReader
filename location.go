@@ -180,7 +180,7 @@ func updateLocation(location *widget.Label) {
 			location.SetText(months)
 		case 12:
 			november = calcGraph(yAxisLocation)
-			months = months + ("November " + november) 
+			months = months + ("November " + november)
 			location.SetText(months)
 		case 13:
 			december = calcGraph(yAxisLocation)
@@ -221,4 +221,17 @@ func calcGraph(ypos int) string {
 	// fmt.Printf(monthStr)
 
 	return monthStr
+}
+
+func resetFunc() {
+	clickCount = 0
+	upperBound = 0
+	lowerBound = 0
+	months = ""
+	confirmed = false
+	fmt.Println("Reset pressed")
+	// isActive := false
+	//
+	// return isActive
+
 }
