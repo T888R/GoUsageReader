@@ -52,12 +52,14 @@ Please type the highest number on the y axis and click Enter`)
 
 	readings := widget.NewLabel(months)
 
-	reset := widget.NewButton("Reset", func() {
-		resetFunc()
-	})
+	// reset := widget.NewButton("Reset", func() {
+	// 	resetFunc()
+	// 	readings.Refresh()
+	// 	info.Refresh()
+	// })
 
-	content := container.NewVBox(header, entry, info, readings, reset)
-	window.Resize(fyne.NewSize(100, 450))
+	content := container.NewVBox(header, entry, info, readings)
+	window.Resize(fyne.NewSize(110, 250))
 	window.SetFixedSize(true)
 
 	window.SetContent(content)

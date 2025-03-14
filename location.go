@@ -32,6 +32,7 @@ var december string
 
 var months string
 var description string
+var canPaste bool
 
 func updateDescription(desc *widget.Label) {
 	switch clickCount {
@@ -94,6 +95,7 @@ func updateDescription(desc *widget.Label) {
 			robotgo.KeyTap("tab")
 			robotgo.TypeStr(december)
 			robotgo.KeyTap("tab")
+			resetFunc()
 		}
 	}
 }
@@ -193,8 +195,6 @@ func updateLocation(location *widget.Label) {
 		// time.Sleep(500 * time.Millisecond)
 		clickCount++
 	}
-	// fmt.Println(yAxisLocation)
-	// fmt.Println(clickCount)
 }
 
 func calcGraph(ypos int) string {
@@ -218,20 +218,16 @@ func calcGraph(ypos int) string {
 	}
 
 	monthStr := fmt.Sprintln(int(correctedUsage))
-	// fmt.Printf(monthStr)
 
 	return monthStr
 }
 
+// Reset state
 func resetFunc() {
-	clickCount = 0
 	upperBound = 0
 	lowerBound = 0
 	months = ""
 	confirmed = false
+	clickCount = 0
 	fmt.Println("Reset pressed")
-	// isActive := false
-	//
-	// return isActive
-
 }
