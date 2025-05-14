@@ -2,36 +2,43 @@ package main
 
 import (
 	"fmt"
+	"strconv"
+	"syscall"
+	"unsafe"
 
 	hook "github.com/robotn/gohook"
 
 	"fyne.io/fyne/v2/widget"
 	// "fyne.io/fyne/v2/driver/desktop"
-	"strconv"
-
-	"github.com/go-vgo/robotgo"
+	// "github.com/go-vgo/robotgo"
 )
 
-var clickCount int
-var yAxisLocation int
-var upperBound int
-var lowerBound int
+var (
+	clickCount    int
+	yAxisLocation int
+	upperBound    int
+	lowerBound    int
+)
 
-var january string
-var february string
-var march string
-var april string
-var may string
-var june string
-var july string
-var august string
-var september string
-var october string
-var november string
-var december string
+var (
+	january   string
+	february  string
+	march     string
+	april     string
+	may       string
+	june      string
+	july      string
+	august    string
+	september string
+	october   string
+	november  string
+	december  string
+)
 
-var months string
-var description string
+var (
+	months      string
+	description string
+)
 
 func updateDescription(desc *widget.Label) {
 	switch clickCount {
@@ -69,31 +76,30 @@ func updateDescription(desc *widget.Label) {
 }
 
 func updateLocation(location *widget.Label) {
-
 	// These comments are for getting cursor position with Windows API
 
-	// userDLL := syscall.NewLazyDLL("user32.dll")
-	// getWindowRectProc := userDLL.NewProc("GetCursorPos")
+	userDLL := syscall.NewLazyDLL("user32.dll")
+	getWindowRectProc := userDLL.NewProc("GetCursorPos")
 
-	// type POINT struct {
-	// X, Y int32
-	// }
-	// var pt POINT
+	type POINT struct {
+		X, Y int32
+	}
+	var pt POINT
 
 	mleft := hook.AddEvent("mleft")
 
 	if mleft && confirmed {
 
-		// _, _, eno := syscall.SyscallN(getWindowRectProc.Addr(), uintptr(unsafe.Pointer(&pt)))
-		// if eno != 0 {
-		// fmt.Println(eno)
-		// }
+		_, _, eno := syscall.SyscallN(getWindowRectProc.Addr(), uintptr(unsafe.Pointer(&pt)))
+		if eno != 0 {
+			fmt.Println(eno)
+		}
 
-		// correct := int32(maxYres) - int32(pt.Y)
+		correct := int32(maxYres) - int32(pt.Y)
 
 		// using robotgo to get cursor position for Linux and potentially MacOS
-		_, y := robotgo.Location()
-		correct := maxYRes - y
+		// _, y := robotgo.Location()
+		// correct := maxYRes - y
 		pos := fmt.Sprint(correct)
 		yAxisLocation, _ = strconv.Atoi(pos)
 
@@ -168,7 +174,6 @@ func updateLocation(location *widget.Label) {
 }
 
 func calcGraph(ypos int, month string) string {
-
 	var usage float32
 	var correctedUsage float32
 

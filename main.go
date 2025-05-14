@@ -9,37 +9,36 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-
-	"github.com/go-vgo/robotgo"
+	"github.com/kbinani/screenshot"
+	// "github.com/go-vgo/robotgo"
 )
 
 var maxYRes int
 
 func main() {
-
 	app := app.New()
 	window := app.NewWindow("Usage Reader")
 
-	num := robotgo.DisplaysNum()
-	for i := 0; i < num; i++ {
-		robotgo.DisplayID = i
-		_, _, _, h := robotgo.GetDisplayBounds(i)
-		if h > maxYRes {
-			maxYRes = h
-		}
-	}
+	// num := robotgo.DisplaysNum()
+	// for i := 0; i < num; i++ {
+	// 	robotgo.DisplayID = i
+	// 	_, _, _, h := robotgo.GetDisplayBounds(i)
+	// 	if h > maxYRes {
+	// 		maxYRes = h
+	// 	}
+	// }
 
 	fmt.Println(maxYRes)
 
-	// screenAmount := screenshot.NumActiveDisplays()
-	//
-	// for i := 0; i < screenAmount; i++ {
-	// 	screenBounds := screenshot.GetDisplayBounds(i)
-	// 	height := screenBounds.Max.Y - screenBounds.Min.Y
-	// 	if height > maxYRes {
-	// 		maxYRes = height
-	// 	}
-	// }
+	screenAmount := screenshot.NumActiveDisplays()
+
+	for i := 0; i < screenAmount; i++ {
+		screenBounds := screenshot.GetDisplayBounds(i)
+		height := screenBounds.Max.Y - screenBounds.Min.Y
+		if height > maxYRes {
+			maxYRes = height
+		}
+	}
 
 	header := widget.NewLabel(`Welcome to the new usage reader. 
 Please type the highest number on the y axis and click Enter`)
@@ -65,5 +64,4 @@ Please type the highest number on the y axis and click Enter`)
 	}()
 
 	window.ShowAndRun()
-
 }
