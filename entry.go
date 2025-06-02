@@ -2,6 +2,7 @@ package main
 
 import (
 	// "fmt"
+	"fmt"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -39,6 +40,7 @@ func (e *numericalEntry) KeyUp(event *fyne.KeyEvent) {
 	case fyne.KeyReturn:
 		inputYMax = e.yAxis
 		confirmed = true
+		fmt.Println(inputYMax, confirmed)
 	case fyne.KeyBackspace:
 		text, err := strconv.Atoi(e.Entry.Text)
 		if err != nil {
