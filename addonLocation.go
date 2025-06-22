@@ -423,7 +423,6 @@ func calcAddonGraph(ypos int) int {
 
 	if ypos < lowerBound {
 		ypos = 0
-		fmt.Printf("clickcount: %d\n", clickCount)
 	}
 
 	// min max calculation
