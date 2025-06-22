@@ -1,13 +1,13 @@
 package main
 
 import (
-	// "fmt"
 	"fmt"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/go-vgo/robotgo"
@@ -16,7 +16,6 @@ import (
 var maxYRes int
 
 func main() {
-
 	app := app.New()
 	window := app.NewWindow("Usage Reader")
 
@@ -52,25 +51,47 @@ Please type the highest number on the y axis and click Enter`)
 
 	readings := widget.NewLabel(months)
 
+	standardUsage := widget.NewButton("Standard Usage", func() {
+		fmt.Println("Standard usage pressed")
+		inputYMax = entry.yAxis
+		addonUsageBool = false
+		regularUsageBool = true
+	})
+
+	addonUsage := widget.NewButton("Addon Usage", func() {
+		fmt.Println("Addon usage pressed")
+		inputYMax = entry.yAxis
+		addonUsageBool = true
+		regularUsageBool = false
+		fmt.Printf("%d addon max\n", inputYMax)
+	})
+
 	// reset := widget.NewButton("Reset", func() {
 	// 	resetFunc()
 	// 	readings.Refresh()
 	// 	info.Refresh()
 	// })
 
-	content := container.NewVBox(header, entry, info, readings)
+	buttons := container.NewHBox(layout.NewSpacer(), standardUsage, addonUsage, layout.NewSpacer())
+	content := container.NewVBox(header, buttons, entry, info, readings)
 	window.Resize(fyne.NewSize(110, 250))
 	window.SetFixedSize(true)
 
 	window.SetContent(content)
 
 	go func() {
-		for range time.Tick(time.Millisecond) {
-			updateLocation(readings)
-			updateDescription(info)
+		ticker := time.NewTicker(time.Millisecond)
+		for range ticker.C {
+			if regularUsageBool && inputYMax != 0 {
+				updateLocation(readings)
+				updateDescription(info)
+			}
+			if addonUsageBool && inputYMax != 0 {
+				updateAddonLocation(readings)
+				updateAddonDescription(info)
+			}
 		}
 	}()
 
 	window.ShowAndRun()
-
 }

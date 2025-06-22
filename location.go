@@ -2,70 +2,106 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	hook "github.com/robotn/gohook"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
 	// "fyne.io/fyne/v2/driver/desktop"
-	"strconv"
 
 	"github.com/go-vgo/robotgo"
 )
 
-var clickCount int
-var yAxisLocation int
-var upperBound int
-var lowerBound int
+var (
+	clickCount    int
+	yAxisLocation int
+	upperBound    int
+	lowerBound    int
+)
 
-var january string
-var february string
-var march string
-var april string
-var may string
-var june string
-var july string
-var august string
-var september string
-var october string
-var november string
-var december string
+var (
+	january   string
+	february  string
+	march     string
+	april     string
+	may       string
+	june      string
+	july      string
+	august    string
+	september string
+	october   string
+	november  string
+	december  string
+)
 
-var months string
-var description string
-var canPaste bool
+var (
+	months      string
+	description string
+)
 
 func updateDescription(desc *widget.Label) {
 	switch clickCount {
 	case 0:
-		desc.SetText("Input y axis, hit enter, and click the top of the graph")
+		fyne.DoAndWait(func() {
+			desc.SetText("Input y axis, hit enter, and click the top of the graph")
+		})
 	case 1:
-		desc.SetText("Set the origin")
+		fyne.DoAndWait(func() {
+			desc.SetText("Set the origin")
+		})
 	case 2:
-		desc.SetText("Click January")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click January")
+		})
 	case 3:
-		desc.SetText("Click February")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click February")
+		})
 	case 4:
-		desc.SetText("Click March")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click March")
+		})
 	case 5:
-		desc.SetText("Click April")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click April")
+		})
 	case 6:
-		desc.SetText("Click May")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click May")
+		})
 	case 7:
-		desc.SetText("Click June")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click June")
+		})
 	case 8:
-		desc.SetText("Click July")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click July")
+		})
 	case 9:
-		desc.SetText("Click August")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click August")
+		})
 	case 10:
-		desc.SetText("Click September")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click September")
+		})
 	case 11:
-		desc.SetText("Click October")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click October")
+		})
 	case 12:
-		desc.SetText("Click November")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click November")
+		})
 	case 13:
-		desc.SetText("Click December")
+		fyne.DoAndWait(func() {
+			desc.SetText("Click December")
+		})
 	default:
-		desc.SetText("Usage calculation completed. Click v with January field selected to paste")
+		fyne.DoAndWait(func() {
+			desc.SetText("Usage calculation completed. Click v with January field selected to paste")
+		})
 
 		ok := hook.AddEvent("v")
 		if ok {
@@ -101,7 +137,6 @@ func updateDescription(desc *widget.Label) {
 }
 
 func updateLocation(location *widget.Label) {
-
 	// These comments are for getting cursor position with Windows API
 
 	// userDLL := syscall.NewLazyDLL("user32.dll")
@@ -114,7 +149,7 @@ func updateLocation(location *widget.Label) {
 
 	mleft := hook.AddEvent("mleft")
 
-	if mleft && confirmed {
+	if mleft {
 
 		// _, _, eno := syscall.SyscallN(getWindowRectProc.Addr(), uintptr(unsafe.Pointer(&pt)))
 		// if eno != 0 {
@@ -143,54 +178,77 @@ func updateLocation(location *widget.Label) {
 		case 2:
 			january = calcGraph(yAxisLocation)
 			months = fmt.Sprint("January " + january)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 3:
 			february = calcGraph(yAxisLocation)
 			months = months + ("February " + february)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 4:
 			march = calcGraph(yAxisLocation)
 			months = months + ("March " + march)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 5:
 			april = calcGraph(yAxisLocation)
 			months = months + ("April " + april)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 6:
 			may = calcGraph(yAxisLocation)
 			months = months + ("May " + may)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 7:
 			june = calcGraph(yAxisLocation)
 			months = months + ("June " + june)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 8:
 			july = calcGraph(yAxisLocation)
 			months = months + ("July " + july)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 9:
 			august = calcGraph(yAxisLocation)
 			months = months + ("August " + august)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 10:
 			september = calcGraph(yAxisLocation)
 			months = months + ("September " + september)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 11:
 			october = calcGraph(yAxisLocation)
 			months = months + ("October " + october)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 12:
 			november = calcGraph(yAxisLocation)
 			months = months + ("November " + november)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		case 13:
 			december = calcGraph(yAxisLocation)
 			months = months + ("December " + december)
-			location.SetText(months)
+			fyne.Do(func() {
+				location.SetText(months)
+			})
 		default:
 			fmt.Println("Completed")
-			location.SetText(months)
 		}
 		// time.Sleep(500 * time.Millisecond)
 		clickCount++
@@ -198,7 +256,6 @@ func updateLocation(location *widget.Label) {
 }
 
 func calcGraph(ypos int) string {
-
 	var usage float32
 	var correctedUsage float32
 
@@ -228,6 +285,8 @@ func resetFunc() {
 	lowerBound = 0
 	months = ""
 	confirmed = false
+	regularUsageBool = false
+	addonUsageBool = false
 	clickCount = 0
 	fmt.Println("Reset pressed")
 }

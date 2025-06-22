@@ -9,8 +9,12 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-var confirmed bool
-var inputYMax int
+var (
+	confirmed        bool
+	inputYMax        int
+	regularUsageBool bool
+	addonUsageBool   bool
+)
 
 type numericalEntry struct {
 	widget.Entry
