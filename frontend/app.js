@@ -11,9 +11,7 @@ let appState = {
 };
 
 // DOM elements
-const imageViewport = document.getElementById('imageViewport');
-const imageContainer = document.getElementById('imageContainer');
-const uploadedImage = document.getElementById('uploadedImage');
+const pageBackground = document.getElementById('pageBackground');
 const fileInput = document.getElementById('fileInput');
 const zoomLevel = document.getElementById('zoomLevel');
 const yMaxInput = document.getElementById('yMaxInput');
@@ -24,7 +22,6 @@ const zoomInBtn = document.getElementById('zoomIn');
 const zoomOutBtn = document.getElementById('zoomOut');
 const description = document.getElementById('description');
 const readingsOutput = document.getElementById('readingsOutput');
-const imagePlaceholder = document.querySelector('.image-placeholder');
 
 // Image import
 importBtn.addEventListener('click', () => fileInput.click());
@@ -34,9 +31,8 @@ fileInput.addEventListener('change', (e) => {
     if (file) {
         const reader = new FileReader();
         reader.onload = (event) => {
-            uploadedImage.src = event.target.result;
-            uploadedImage.style.display = 'block';
-            imagePlaceholder.style.display = 'none';
+            pageBackground.style.backgroundImage = `url(${event.target.result})`;
+            document.body.style.background = 'none';
             resetView();
         };
         reader.readAsDataURL(file);
@@ -45,7 +41,7 @@ fileInput.addEventListener('change', (e) => {
 
 // Update transform
 function updateTransform() {
-    imageContainer.style.transform = `translate(${appState.panX}px, ${appState.panY}px) scale(${appState.zoom})`;
+    pageBackground.style.transform = `translate(${appState.panX}px, ${appState.panY}px) scale(${appState.zoom})`;
     zoomLevel.textContent = `${Math.round(appState.zoom * 100)}%`;
 }
 
@@ -72,15 +68,15 @@ zoomInBtn.addEventListener('click', zoomIn);
 zoomOutBtn.addEventListener('click', zoomOut);
 
 // Mouse wheel zoom
-imageViewport.addEventListener('wheel', (e) => {
+document.addEventListener('wheel', (e) => {
+    if (e.target.closest('.container')) return; // Don't zoom when scrolling over the UI container
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.max(0.1, Math.min(5, appState.zoom * delta));
     
     // Zoom towards mouse pointer
-    const rect = imageViewport.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left - rect.width / 2;
-    const mouseY = e.clientY - rect.top - rect.height / 2;
+    const mouseX = e.clientX - window.innerWidth / 2;
+    const mouseY = e.clientY - window.innerHeight / 2;
     
     appState.panX = mouseX - (mouseX - appState.panX) * (newZoom / appState.zoom);
     appState.panY = mouseY - (mouseY - appState.panY) * (newZoom / appState.zoom);
@@ -91,14 +87,17 @@ imageViewport.addEventListener('wheel', (e) => {
 
 // Pan with Ctrl + drag or Middle mouse button
 // Capture clicks for usage reading
-imageViewport.addEventListener('mousedown', (e) => {
+document.addEventListener('mousedown', (e) => {
+    // Don't capture if clicking on the container UI
+    if (e.target.closest('.container')) return;
+    
     // Check if this is a pan action (Ctrl key or middle mouse button)
     if (e.ctrlKey || e.button === 1) {
         e.preventDefault();
         appState.isPanning = true;
         appState.startX = e.clientX - appState.panX;
         appState.startY = e.clientY - appState.panY;
-        imageViewport.classList.add('panning');
+        document.body.classList.add('panning');
         return;
     }
     
@@ -119,16 +118,15 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('mouseup', () => {
     appState.isPanning = false;
-    imageViewport.classList.remove('panning');
+    document.body.classList.remove('panning');
 });
 
 // Handle capture click - sends Y coordinate to backend
 async function handleCaptureClick(e) {
     if (!appState.mode) return;
     
-    // Get click position relative to the viewport
-    const rect = imageViewport.getBoundingClientRect();
-    const yPos = e.clientY - rect.top;
+    // Get click position relative to the window (for full-page background)
+    const yPos = e.clientY;
     
     // Send to backend
     try {
@@ -174,7 +172,7 @@ document.addEventListener('keyup', (e) => {
 });
 
 // Disable context menu on middle click for panning
-imageViewport.addEventListener('contextmenu', (e) => {
+document.addEventListener('contextmenu', (e) => {
     if (e.button === 1) {
         e.preventDefault();
     }

@@ -21,6 +21,8 @@ body {
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     max-width: 600px;
     width: 100%;
+    position: relative;
+    z-index: 1;
 }
 
 h1 {
@@ -181,57 +183,22 @@ button {
     font-size: 0.9rem;
 }
 
-.image-viewport {
-    width: 100%;
-    height: 300px;
-    background: #f0f0f0;
-    border: 2px dashed #ccc;
-    border-radius: 8px;
-    overflow: hidden;
-    position: relative;
-    cursor: grab;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.image-viewport:active {
-    cursor: grabbing;
-}
-
-.image-viewport.panning {
-    cursor: grabbing;
-}
-
-.image-container {
-    position: absolute;
+#pageBackground {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     transform-origin: center center;
     will-change: transform;
 }
 
-#uploadedImage {
-    max-width: none;
-    max-height: none;
-    display: block;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-}
-
-.image-placeholder {
-    text-align: center;
-    color: #888;
-}
-
-.image-placeholder p {
-    margin: 8px 0;
-    font-size: 0.9rem;
-}
-
-.image-placeholder kbd {
-    background: #e0e0e0;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 0.85rem;
+body.panning {
+    cursor: grabbing;
 }
 
 /* Active mode indicators */
