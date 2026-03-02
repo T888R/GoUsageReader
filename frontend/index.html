@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Reader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Usage Reader</h1>
+        
+        <div class="intro">
+            <p>Welcome to Usage Reader.</p>
+            <p>Import a graph image, set the Y-axis max value, then click points on the graph.</p>
+        </div>
+
+        <div class="controls">
+            <input type="number" id="yMaxInput" placeholder="Max number on Y axis" min="0">
+            
+            <div class="buttons">
+                <button id="standardBtn">Standard Usage</button>
+                <button id="addonBtn">Addon Usage</button>
+            </div>
+        </div>
+
+        <div class="image-controls">
+            <button id="importBtn">Import Image</button>
+            <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" style="display: none;">
+            <div class="zoom-controls">
+                <button id="zoomOut">-</button>
+                <span id="zoomLevel">100%</span>
+                <button id="zoomIn">+</button>
+            </div>
+        </div>
+
+        <div class="status">
+            <p id="description">Import an image and enter Y-axis max to begin</p>
+        </div>
+
+        <div class="readings">
+            <pre id="readingsOutput"></pre>
+        </div>
+
+        <div class="image-viewport" id="imageViewport">
+            <div class="image-container" id="imageContainer">
+                <img id="uploadedImage" style="display: none;">
+            </div>
+            <div class="image-placeholder">
+                <p>Import an image to get started</p>
+                <p>Hold <kbd>Ctrl</kbd> or <kbd>Middle Mouse</kbd> to pan</p>
+                <p>Use <kbd>+</kbd>/<kbd>-</kbd> or <kbd>Scroll</kbd> to zoom</p>
+                <p>Left click on the graph to capture points</p>
+                <p>Press <kbd>Esc</kbd> to reset</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="runtime.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

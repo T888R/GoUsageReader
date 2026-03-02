@@ -1,0 +1,28 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "UsageReader",
+  "outputfilename": "UsageReader",
+  "frontend": {
+    "dir": "./frontend",
+    "install": "npm install",
+    "build": "npm run build",
+    "package": "npm",
+    "dev": "npm run dev"
+  },
+  "assetdir": "./frontend/dist",
+  "wailsjsdir": "./frontend",
+  "version": "2.0",
+  "debounceMS": 100,
+  "bindings": {
+    "ts_generation": {
+      "outputType": "classes"
+    }
+  },
+  "info": {
+    "companyName": "UsageReader",
+    "productName": "UsageReader",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2024",
+    "comments": "A tool for reading usage graphs"
+  }
+}

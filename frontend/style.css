@@ -1,0 +1,240 @@
+/* Modern reset */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 100%;
+}
+
+h1 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+}
+
+.intro {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.intro p {
+    color: #666;
+    margin: 5px 0;
+    font-size: 0.95rem;
+}
+
+.controls {
+    margin-bottom: 20px;
+}
+
+#yMaxInput {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+    margin-bottom: 12px;
+}
+
+#yMaxInput:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.buttons {
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#standardBtn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+#standardBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+#addonBtn {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+#addonBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+}
+
+.image-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+#importBtn {
+    background: #4caf50;
+    color: white;
+    padding: 10px 20px;
+    flex: 0 0 auto;
+}
+
+#importBtn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f5f5f5;
+    padding: 8px 12px;
+    border-radius: 20px;
+}
+
+#zoomOut, #zoomIn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    padding: 0;
+    flex: 0 0 auto;
+}
+
+#zoomOut:hover, #zoomIn:hover {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+#zoomLevel {
+    font-weight: 600;
+    color: #333;
+    min-width: 50px;
+    text-align: center;
+}
+
+.status {
+    background: #f8f9fa;
+    border-left: 4px solid #667eea;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+#description {
+    color: #555;
+    font-weight: 500;
+}
+
+.readings {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#readingsOutput {
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.image-viewport {
+    width: 100%;
+    height: 300px;
+    background: #f0f0f0;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-viewport:active {
+    cursor: grabbing;
+}
+
+.image-viewport.panning {
+    cursor: grabbing;
+}
+
+.image-container {
+    position: absolute;
+    transform-origin: center center;
+    will-change: transform;
+}
+
+#uploadedImage {
+    max-width: none;
+    max-height: none;
+    display: block;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.image-placeholder {
+    text-align: center;
+    color: #888;
+}
+
+.image-placeholder p {
+    margin: 8px 0;
+    font-size: 0.9rem;
+}
+
+.image-placeholder kbd {
+    background: #e0e0e0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+/* Active mode indicators */
+.mode-active {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
+}
