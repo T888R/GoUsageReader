@@ -40,9 +40,16 @@ fileInput.addEventListener('change', (e) => {
 });
 
 // Update transform
+let rafId = null;
 function updateTransform() {
-    pageBackground.style.transform = `translate(${appState.panX}px, ${appState.panY}px) scale(${appState.zoom})`;
-    zoomLevel.textContent = `${Math.round(appState.zoom * 100)}%`;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+        pageBackground.style.webkitTransform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom})`;
+        pageBackground.style.transform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom})`;
+        zoomLevel.textContent = `${Math.round(appState.zoom * 100)}%`;
+        // Force repaint to clear artifacts in WebKit
+        void pageBackground.offsetHeight;
+    });
 }
 
 // Reset view
