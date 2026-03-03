@@ -7,17 +7,20 @@ let appState = {
     startX: 0,
     startY: 0,
     mode: null, // 'standard' or 'addon'
-    isCapturing: false
+    isCapturing: false,
+    gridEnabled: false
 };
 
 // DOM elements
 const pageBackground = document.getElementById('pageBackground');
+const gridOverlay = document.getElementById('gridOverlay');
 const fileInput = document.getElementById('fileInput');
 const zoomLevel = document.getElementById('zoomLevel');
 const yMaxInput = document.getElementById('yMaxInput');
 const standardBtn = document.getElementById('standardBtn');
 const addonBtn = document.getElementById('addonBtn');
 const importBtn = document.getElementById('importBtn');
+const gridToggle = document.getElementById('gridToggle');
 const zoomInBtn = document.getElementById('zoomIn');
 const zoomOutBtn = document.getElementById('zoomOut');
 const description = document.getElementById('description');
@@ -25,6 +28,16 @@ const readingsOutput = document.getElementById('readingsOutput');
 
 // Image import
 importBtn.addEventListener('click', () => fileInput.click());
+
+// Grid toggle
+gridToggle.addEventListener('click', () => {
+    appState.gridEnabled = !appState.gridEnabled;
+    if (gridOverlay) {
+        gridOverlay.style.display = appState.gridEnabled ? 'block' : 'none';
+    }
+    gridToggle.textContent = appState.gridEnabled ? 'Grid: On' : 'Grid: Off';
+    gridToggle.classList.toggle('active', appState.gridEnabled);
+});
 
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -44,8 +57,16 @@ let rafId = null;
 function updateTransform() {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
-        pageBackground.style.webkitTransform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom})`;
-        pageBackground.style.transform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom})`;
+        const transform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom})`;
+        pageBackground.style.webkitTransform = transform;
+        pageBackground.style.transform = transform;
+        
+        // Update grid overlay with same transform
+        if (gridOverlay) {
+            gridOverlay.style.webkitTransform = transform;
+            gridOverlay.style.transform = transform;
+        }
+        
         zoomLevel.textContent = `${Math.round(appState.zoom * 100)}%`;
         // Force repaint to clear artifacts in WebKit
         void pageBackground.offsetHeight;
