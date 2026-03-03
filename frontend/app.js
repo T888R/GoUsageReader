@@ -61,11 +61,7 @@ function updateTransform() {
         pageBackground.style.webkitTransform = transform;
         pageBackground.style.transform = transform;
         
-        // Update grid overlay with same transform
-        if (gridOverlay) {
-            gridOverlay.style.webkitTransform = transform;
-            gridOverlay.style.transform = transform;
-        }
+        // Grid overlay stays fixed - no transform applied
         
         zoomLevel.textContent = `${Math.round(appState.zoom * 100)}%`;
         // Force repaint to clear artifacts in WebKit
