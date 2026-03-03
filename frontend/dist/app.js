@@ -3,12 +3,15 @@ let appState = {
     zoom: 1,
     panX: 0,
     panY: 0,
+    rotation: 0,
     isPanning: false,
+    isRotating: false,
     startX: 0,
     startY: 0,
     mode: null, // 'standard' or 'addon'
     isCapturing: false,
-    gridEnabled: false
+    gridEnabled: false,
+    isShiftHeld: false
 };
 
 // DOM elements
@@ -57,7 +60,7 @@ let rafId = null;
 function updateTransform() {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
-        const transform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom})`;
+        const transform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom}) rotate(${appState.rotation}deg)`;
         pageBackground.style.webkitTransform = transform;
         pageBackground.style.transform = transform;
         
@@ -74,6 +77,7 @@ function resetView() {
     appState.zoom = 1;
     appState.panX = 0;
     appState.panY = 0;
+    appState.rotation = 0;
     updateTransform();
 }
 
@@ -109,11 +113,21 @@ document.addEventListener('wheel', (e) => {
     updateTransform();
 }, { passive: false });
 
-// Pan with Ctrl + drag or Middle mouse button
+// Pan with Ctrl + drag or Middle mouse button, Rotate with Shift + drag
 // Capture clicks for usage reading
 document.addEventListener('mousedown', (e) => {
     // Don't capture if clicking on the container UI
     if (e.target.closest('.container')) return;
+    
+    // Check if this is a rotate action (Shift key)
+    if (e.shiftKey) {
+        e.preventDefault();
+        appState.isRotating = true;
+        appState.startX = e.clientX;
+        appState.startY = e.clientY;
+        document.body.classList.add('rotating');
+        return;
+    }
     
     // Check if this is a pan action (Ctrl key or middle mouse button)
     if (e.ctrlKey || e.button === 1) {
@@ -137,12 +151,20 @@ document.addEventListener('mousemove', (e) => {
         appState.panX = e.clientX - appState.startX;
         appState.panY = e.clientY - appState.startY;
         updateTransform();
+    } else if (appState.isRotating) {
+        e.preventDefault();
+        // Calculate rotation based on horizontal mouse movement
+        const deltaX = e.clientX - appState.startX;
+        appState.rotation = deltaX * 0.5; // Adjust sensitivity
+        updateTransform();
     }
 });
 
 document.addEventListener('mouseup', () => {
     appState.isPanning = false;
+    appState.isRotating = false;
     document.body.classList.remove('panning');
+    document.body.classList.remove('rotating');
 });
 
 // Handle capture click - sends Y coordinate to backend
@@ -179,6 +201,12 @@ document.addEventListener('keydown', (e) => {
     if (keysPressed[e.key]) return;
     keysPressed[e.key] = true;
     
+    // Track Shift key state
+    if (e.key === 'Shift') {
+        appState.isShiftHeld = true;
+        document.body.classList.add('shift-held');
+    }
+    
     if (e.key === '+' || e.key === '=') {
         e.preventDefault();
         zoomIn();
@@ -193,6 +221,12 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('keyup', (e) => {
     keysPressed[e.key] = false;
+    
+    // Track Shift key release
+    if (e.key === 'Shift') {
+        appState.isShiftHeld = false;
+        document.body.classList.remove('shift-held');
+    }
 });
 
 // Disable context menu on middle click for panning

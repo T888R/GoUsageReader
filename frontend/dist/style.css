@@ -247,6 +247,14 @@ body.panning {
     cursor: grabbing;
 }
 
+body.rotating {
+    cursor: grab;
+}
+
+body.shift-held #pageBackground {
+    cursor: grab;
+}
+
 /* Active mode indicators */
 .mode-active {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
