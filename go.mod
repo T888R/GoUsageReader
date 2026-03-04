@@ -4,10 +4,7 @@ go 1.23.0
 
 toolchain go1.24.3
 
-require (
-	github.com/wailsapp/wails/v2 v2.11.0
-	gocv.io/x/gocv v0.37.0
-)
+require github.com/wailsapp/wails/v2 v2.11.0
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect

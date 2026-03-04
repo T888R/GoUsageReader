@@ -6,6 +6,10 @@ export function ApplyPerspectiveTransform(arg1, arg2, arg3) {
   return window['go']['main']['App']['ApplyPerspectiveTransform'](arg1, arg2, arg3);
 }
 
+export function ApplyPerspectiveTransformParallel(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ApplyPerspectiveTransformParallel'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function GetAddonDescription() {
   return window['go']['main']['App']['GetAddonDescription']();
 }

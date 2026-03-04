@@ -3,6 +3,8 @@
 
 export function ApplyPerspectiveTransform(arg1:Array<number>,arg2:number,arg3:number):Promise<Array<number>>;
 
+export function ApplyPerspectiveTransformParallel(arg1:Array<number>,arg2:number,arg3:number,arg4:any,arg5:any):Promise<Array<number>>;
+
 export function GetAddonDescription():Promise<string>;
 
 export function GetAllReadings():Promise<string>;

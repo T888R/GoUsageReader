@@ -1,18 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"fmt"
 	"image"
+	"image/color"
+	"image/png"
+	"math"
 	"strconv"
+	"sync"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"gocv.io/x/gocv"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -448,7 +452,7 @@ func (a *App) autoPaste() {
 		a.october + "\t" + a.november + "\t" + a.december
 
 	// Emit an event to the frontend to trigger the paste
-	runtime.EventsEmit(a.ctx, "auto-paste", allData)
+	wailsruntime.EventsEmit(a.ctx, "auto-paste", allData)
 
 	// Reset after a short delay
 	go func() {
@@ -547,61 +551,37 @@ func (a *App) GetImageDimensions() (int, int) {
 }
 
 // ApplyPerspectiveTransform applies perspective transformation to the image data
+// Uses parallel goroutines with 32-row chunks for optimal performance
 // Returns base64 encoded transformed image
 func (a *App) ApplyPerspectiveTransform(imageData []byte, width, height int) ([]byte, error) {
-	// Create source points from corner points
-	srcPointVector := gocv.NewPointVector()
-	defer srcPointVector.Close()
-	for _, point := range a.cornerPoints {
-		srcPointVector.Append(image.Point{X: int(point[0]), Y: int(point[1])})
-	}
-
-	// Calculate output dimensions
+	// Calculate output dimensions from corner points
 	srcPoints := make([]image.Point, 4)
 	for i, point := range a.cornerPoints {
 		srcPoints[i] = image.Point{X: int(point[0]), Y: int(point[1])}
 	}
-	maxWidth, maxHeight := calculateOutputDimensions(srcPoints)
+	dstWidth, dstHeight := calculateOutputDimensions(srcPoints)
 
-	// Create destination points (rectangle)
-	dstPointVector := gocv.NewPointVector()
-	defer dstPointVector.Close()
-	dstPointVector.Append(image.Point{X: 0, Y: 0})
-	dstPointVector.Append(image.Point{X: maxWidth - 1, Y: 0})
-	dstPointVector.Append(image.Point{X: maxWidth - 1, Y: maxHeight - 1})
-	dstPointVector.Append(image.Point{X: 0, Y: maxHeight - 1})
+	// Define source corners (original image bounds in screen space)
+	// These are the current corner points
+	srcCorners := a.cornerPoints
 
-	// Get perspective transform matrix
-	transformMatrix := gocv.GetPerspectiveTransform(srcPointVector, dstPointVector)
-	defer transformMatrix.Close()
+	// Define destination corners (rectangle at origin)
+	var dstCorners [4][2]float64
+	dstCorners[0] = [2]float64{0, 0}                                          // top-left
+	dstCorners[1] = [2]float64{float64(dstWidth - 1), 0}                      // top-right
+	dstCorners[2] = [2]float64{float64(dstWidth - 1), float64(dstHeight - 1)} // bottom-right
+	dstCorners[3] = [2]float64{0, float64(dstHeight - 1)}                     // bottom-left
 
-	// Decode image from bytes
-	img, err := gocv.IMDecode(imageData, gocv.IMReadColor)
+	// Apply perspective transform using parallel processing
+	result, err := a.ApplyPerspectiveTransformParallel(imageData, dstWidth, dstHeight, srcCorners, dstCorners)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode image: %w", err)
+		return nil, fmt.Errorf("failed to apply perspective transform: %w", err)
 	}
-	defer img.Close()
-
-	// Apply perspective warp
-	warped := gocv.NewMat()
-	defer warped.Close()
-
-	gocv.WarpPerspective(img, &warped, transformMatrix, image.Point{X: maxWidth, Y: maxHeight})
-
-	// Encode result as PNG
-	encodedBuf, err := gocv.IMEncodeWithParams(gocv.PNGFileExt, warped, []int{gocv.IMWritePngCompression, 3})
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode transformed image: %w", err)
-	}
-	defer encodedBuf.Close()
-
-	// Convert NativeByteBuffer to []byte
-	encoded := encodedBuf.GetBytes()
 
 	// Store transformed image
-	a.transformedImg = encoded
+	a.transformedImg = result
 
-	return encoded, nil
+	return result, nil
 }
 
 // GetTransformedImage returns the last transformed image
@@ -656,6 +636,258 @@ func sqrt(x float64) float64 {
 		z = (z + x/z) / 2
 	}
 	return z
+}
+
+// Matrix3x3 represents a 3x3 transformation matrix for homography
+type Matrix3x3 [9]float64
+
+// ApplyPerspectiveTransformParallel applies perspective transformation using parallel goroutines
+// Processes the image in chunks of 32 rows for optimal performance
+func (a *App) ApplyPerspectiveTransformParallel(imageData []byte, dstWidth, dstHeight int, srcCorners, dstCorners [4][2]float64) ([]byte, error) {
+	// Decode the source image
+	srcImg, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	srcBounds := srcImg.Bounds()
+	srcWidth := srcBounds.Dx()
+	srcHeight := srcBounds.Dy()
+
+	// Create destination image
+	dstImg := image.NewRGBA(image.Rect(0, 0, dstWidth, dstHeight))
+
+	// Compute homography matrix (maps destination to source)
+	H := computeHomography(dstCorners, srcCorners)
+	invH := invertMatrix3x3(H)
+
+	// Check if matrix is singular (all zeros means inversion failed)
+	isZero := true
+	for _, v := range invH {
+		if v != 0 {
+			isZero = false
+			break
+		}
+	}
+	if isZero {
+		return nil, fmt.Errorf("failed to compute inverse homography matrix")
+	}
+
+	// Process rows in parallel with chunks of 32 rows
+	chunkSize := 32
+	numChunks := (dstHeight + chunkSize - 1) / chunkSize
+
+	var wg sync.WaitGroup
+	wg.Add(numChunks)
+
+	for chunk := 0; chunk < numChunks; chunk++ {
+		startRow := chunk * chunkSize
+		endRow := startRow + chunkSize
+		if endRow > dstHeight {
+			endRow = dstHeight
+		}
+
+		go func(startY, endY int) {
+			defer wg.Done()
+
+			for y := startY; y < endY; y++ {
+				for x := 0; x < dstWidth; x++ {
+					// Apply inverse homography to get source coordinate
+					srcCoord := applyHomography(invH, float64(x), float64(y))
+
+					// Check if source coordinate is within bounds
+					if srcCoord.x >= 0 && srcCoord.x < float64(srcWidth) &&
+						srcCoord.y >= 0 && srcCoord.y < float64(srcHeight) {
+						// Sample pixel with bilinear interpolation
+						c := bilinearSample(srcImg, srcCoord.x, srcCoord.y, srcBounds)
+						dstImg.Set(x, y, c)
+					}
+				}
+			}
+		}(startRow, endRow)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+
+	// Encode result as PNG
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, dstImg); err != nil {
+		return nil, fmt.Errorf("failed to encode transformed image: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// computeHomography computes the homography matrix from point correspondences
+func computeHomography(dst, src [4][2]float64) Matrix3x3 {
+	// Build matrix A (8x9)
+	A := make([][]float64, 8)
+	for i := range A {
+		A[i] = make([]float64, 9)
+	}
+
+	for i := 0; i < 4; i++ {
+		sx, sy := src[i][0], src[i][1]
+		dx, dy := dst[i][0], dst[i][1]
+
+		// Two rows per point
+		A[i*2][0], A[i*2][1], A[i*2][2] = sx, sy, 1
+		A[i*2][3], A[i*2][4], A[i*2][5] = 0, 0, 0
+		A[i*2][6], A[i*2][7], A[i*2][8] = -sx*dx, -sy*dx, -dx
+
+		A[i*2+1][0], A[i*2+1][1], A[i*2+1][2] = 0, 0, 0
+		A[i*2+1][3], A[i*2+1][4], A[i*2+1][5] = sx, sy, 1
+		A[i*2+1][6], A[i*2+1][7], A[i*2+1][8] = -sx*dy, -sy*dy, -dy
+	}
+
+	// Solve using Gaussian elimination (simplified: set h33 = 1)
+	B := make([][]float64, 8)
+	c := make([]float64, 8)
+	for i := 0; i < 8; i++ {
+		B[i] = make([]float64, 8)
+		copy(B[i], A[i][:8])
+		c[i] = -A[i][8]
+	}
+
+	solution := solveLinearSystem(B, c)
+	if solution == nil {
+		return Matrix3x3{}
+	}
+
+	// Add h33 = 1
+	var H Matrix3x3
+	copy(H[:8], solution)
+	H[8] = 1
+
+	return H
+}
+
+// invertMatrix3x3 inverts a 3x3 matrix
+func invertMatrix3x3(m Matrix3x3) Matrix3x3 {
+	det := m[0]*(m[4]*m[8]-m[5]*m[7]) -
+		m[1]*(m[3]*m[8]-m[5]*m[6]) +
+		m[2]*(m[3]*m[7]-m[4]*m[6])
+
+	if math.Abs(det) < 1e-10 {
+		return Matrix3x3{}
+	}
+
+	invDet := 1.0 / det
+
+	return Matrix3x3{
+		(m[4]*m[8] - m[5]*m[7]) * invDet,
+		(m[2]*m[7] - m[1]*m[8]) * invDet,
+		(m[1]*m[5] - m[2]*m[4]) * invDet,
+		(m[5]*m[6] - m[3]*m[8]) * invDet,
+		(m[0]*m[8] - m[2]*m[6]) * invDet,
+		(m[2]*m[3] - m[0]*m[5]) * invDet,
+		(m[3]*m[7] - m[4]*m[6]) * invDet,
+		(m[1]*m[6] - m[0]*m[7]) * invDet,
+		(m[0]*m[4] - m[1]*m[3]) * invDet,
+	}
+}
+
+// applyHomography applies a homography matrix to a point
+type point struct {
+	x, y float64
+}
+
+func applyHomography(H Matrix3x3, x, y float64) point {
+	w := H[6]*x + H[7]*y + H[8]
+	if math.Abs(w) < 1e-10 {
+		return point{0, 0}
+	}
+	return point{
+		x: (H[0]*x + H[1]*y + H[2]) / w,
+		y: (H[3]*x + H[4]*y + H[5]) / w,
+	}
+}
+
+// bilinearSample performs bilinear interpolation sampling
+func bilinearSample(img image.Image, x, y float64, bounds image.Rectangle) color.Color {
+	x0 := int(x)
+	y0 := int(y)
+	x1 := x0 + 1
+	y1 := y0 + 1
+
+	if x1 >= bounds.Max.X {
+		x1 = bounds.Max.X - 1
+	}
+	if y1 >= bounds.Max.Y {
+		y1 = bounds.Max.Y - 1
+	}
+
+	fx := x - float64(x0)
+	fy := y - float64(y0)
+
+	r00, g00, b00, a00 := img.At(x0, y0).RGBA()
+	r01, g01, b01, a01 := img.At(x1, y0).RGBA()
+	r10, g10, b10, a10 := img.At(x0, y1).RGBA()
+	r11, g11, b11, a11 := img.At(x1, y1).RGBA()
+
+	// Bilinear interpolation for each channel
+	r := uint16((float64(r00)*(1-fx)*(1-fy) + float64(r01)*fx*(1-fy) +
+		float64(r10)*(1-fx)*fy + float64(r11)*fx*fy))
+	g := uint16((float64(g00)*(1-fx)*(1-fy) + float64(g01)*fx*(1-fy) +
+		float64(g10)*(1-fx)*fy + float64(g11)*fx*fy))
+	b := uint16((float64(b00)*(1-fx)*(1-fy) + float64(b01)*fx*(1-fy) +
+		float64(b10)*(1-fx)*fy + float64(b11)*fx*fy))
+	a := uint16((float64(a00)*(1-fx)*(1-fy) + float64(a01)*fx*(1-fy) +
+		float64(a10)*(1-fx)*fy + float64(a11)*fx*fy))
+
+	return color.RGBA64{r, g, b, a}
+}
+
+// solveLinearSystem solves an 8x8 linear system using Gaussian elimination
+func solveLinearSystem(A [][]float64, b []float64) []float64 {
+	n := len(A)
+	M := make([][]float64, n)
+	for i := range M {
+		M[i] = make([]float64, n+1)
+		copy(M[i], A[i])
+		M[i][n] = b[i]
+	}
+
+	// Gaussian elimination with partial pivoting
+	for i := 0; i < n; i++ {
+		// Find pivot
+		maxRow := i
+		maxVal := math.Abs(M[i][i])
+		for k := i + 1; k < n; k++ {
+			if val := math.Abs(M[k][i]); val > maxVal {
+				maxVal = val
+				maxRow = k
+			}
+		}
+
+		if maxVal < 1e-10 {
+			return nil
+		}
+
+		// Swap rows
+		M[i], M[maxRow] = M[maxRow], M[i]
+
+		// Eliminate
+		for k := i + 1; k < n; k++ {
+			factor := M[k][i] / M[i][i]
+			for j := i; j <= n; j++ {
+				M[k][j] -= factor * M[i][j]
+			}
+		}
+	}
+
+	// Back substitution
+	x := make([]float64, n)
+	for i := n - 1; i >= 0; i-- {
+		sum := M[i][n]
+		for j := i + 1; j < n; j++ {
+			sum -= M[i][j] * x[j]
+		}
+		x[i] = sum / M[i][i]
+	}
+
+	return x
 }
 
 func main() {
