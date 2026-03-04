@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"image"
 	"strconv"
 
 	"github.com/wailsapp/wails/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"gocv.io/x/gocv"
 )
 
 //go:embed all:frontend/dist
@@ -55,6 +57,13 @@ type App struct {
 	octA, octB int
 	novA, novB int
 	decA, decB int
+
+	// Perspective transform data
+	cornerPoints    [4][2]float64 // 4 corners: top-left, top-right, bottom-right, bottom-left
+	transformedImg  []byte        // Base64 encoded transformed image
+	perspectiveMode bool          // Whether perspective mode is active
+	imgWidth        int           // Original image width
+	imgHeight       int           // Original image height
 }
 
 // NewApp creates a new App application struct
@@ -503,6 +512,150 @@ func (a *App) IsAddonMode() bool {
 // GetClickCount returns the current click count
 func (a *App) GetClickCount() int {
 	return a.clickCount
+}
+
+// SetCornerPoints sets the 4 corner points for perspective transformation
+// Points should be in order: top-left, top-right, bottom-right, bottom-left
+func (a *App) SetCornerPoints(points [4][2]float64) {
+	a.cornerPoints = points
+}
+
+// GetCornerPoints returns the current corner points
+func (a *App) GetCornerPoints() [4][2]float64 {
+	return a.cornerPoints
+}
+
+// SetPerspectiveMode enables/disables perspective transform mode
+func (a *App) SetPerspectiveMode(enabled bool) {
+	a.perspectiveMode = enabled
+}
+
+// IsPerspectiveMode returns whether perspective mode is active
+func (a *App) IsPerspectiveMode() bool {
+	return a.perspectiveMode
+}
+
+// SetImageDimensions stores the original image dimensions
+func (a *App) SetImageDimensions(width, height int) {
+	a.imgWidth = width
+	a.imgHeight = height
+}
+
+// GetImageDimensions returns the original image dimensions
+func (a *App) GetImageDimensions() (int, int) {
+	return a.imgWidth, a.imgHeight
+}
+
+// ApplyPerspectiveTransform applies perspective transformation to the image data
+// Returns base64 encoded transformed image
+func (a *App) ApplyPerspectiveTransform(imageData []byte, width, height int) ([]byte, error) {
+	// Create source points from corner points
+	srcPointVector := gocv.NewPointVector()
+	defer srcPointVector.Close()
+	for _, point := range a.cornerPoints {
+		srcPointVector.Append(image.Point{X: int(point[0]), Y: int(point[1])})
+	}
+
+	// Calculate output dimensions
+	srcPoints := make([]image.Point, 4)
+	for i, point := range a.cornerPoints {
+		srcPoints[i] = image.Point{X: int(point[0]), Y: int(point[1])}
+	}
+	maxWidth, maxHeight := calculateOutputDimensions(srcPoints)
+
+	// Create destination points (rectangle)
+	dstPointVector := gocv.NewPointVector()
+	defer dstPointVector.Close()
+	dstPointVector.Append(image.Point{X: 0, Y: 0})
+	dstPointVector.Append(image.Point{X: maxWidth - 1, Y: 0})
+	dstPointVector.Append(image.Point{X: maxWidth - 1, Y: maxHeight - 1})
+	dstPointVector.Append(image.Point{X: 0, Y: maxHeight - 1})
+
+	// Get perspective transform matrix
+	transformMatrix := gocv.GetPerspectiveTransform(srcPointVector, dstPointVector)
+	defer transformMatrix.Close()
+
+	// Decode image from bytes
+	img, err := gocv.IMDecode(imageData, gocv.IMReadColor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+	defer img.Close()
+
+	// Apply perspective warp
+	warped := gocv.NewMat()
+	defer warped.Close()
+
+	gocv.WarpPerspective(img, &warped, transformMatrix, image.Point{X: maxWidth, Y: maxHeight})
+
+	// Encode result as PNG
+	encodedBuf, err := gocv.IMEncodeWithParams(gocv.PNGFileExt, warped, []int{gocv.IMWritePngCompression, 3})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode transformed image: %w", err)
+	}
+	defer encodedBuf.Close()
+
+	// Convert NativeByteBuffer to []byte
+	encoded := encodedBuf.GetBytes()
+
+	// Store transformed image
+	a.transformedImg = encoded
+
+	return encoded, nil
+}
+
+// GetTransformedImage returns the last transformed image
+func (a *App) GetTransformedImage() []byte {
+	return a.transformedImg
+}
+
+// ResetPerspective resets perspective transform data
+func (a *App) ResetPerspective() {
+	a.cornerPoints = [4][2]float64{}
+	a.transformedImg = nil
+	a.perspectiveMode = false
+}
+
+// calculateOutputDimensions calculates the output dimensions for perspective transform
+func calculateOutputDimensions(pts []image.Point) (int, int) {
+	// Calculate width - max of top and bottom edge lengths
+	widthTop := distance(pts[0], pts[1])
+	widthBottom := distance(pts[3], pts[2])
+	maxWidth := int(max(widthTop, widthBottom))
+
+	// Calculate height - max of left and right edge lengths
+	heightLeft := distance(pts[0], pts[3])
+	heightRight := distance(pts[1], pts[2])
+	maxHeight := int(max(heightLeft, heightRight))
+
+	return maxWidth, maxHeight
+}
+
+// distance calculates Euclidean distance between two points
+func distance(p1, p2 image.Point) float64 {
+	dx := float64(p2.X - p1.X)
+	dy := float64(p2.Y - p1.Y)
+	return sqrt(dx*dx + dy*dy)
+}
+
+// max returns the maximum of two float64 values
+func max(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// sqrt calculates square root
+func sqrt(x float64) float64 {
+	if x == 0 {
+		return 0
+	}
+	z := x
+	for i := 0; i < 10; i++ {
+		z = (z + x/z) / 2
+	}
+	return z
 }
 
 func main() {

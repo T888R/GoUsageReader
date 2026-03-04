@@ -9,6 +9,16 @@
 <body>
     <div id="pageBackground"></div>
     <div id="gridOverlay" style="display: none;"></div>
+    
+    <!-- Perspective transform corner handles -->
+    <div id="perspectiveControls" style="display: none;">
+        <div class="corner-handle" id="corner-tl" data-corner="0" title="Top-left corner"></div>
+        <div class="corner-handle" id="corner-tr" data-corner="1" title="Top-right corner"></div>
+        <div class="corner-handle" id="corner-br" data-corner="2" title="Bottom-right corner"></div>
+        <div class="corner-handle" id="corner-bl" data-corner="3" title="Bottom-left corner"></div>
+        <div id="perspectiveLines"></div>
+    </div>
+    
     <div class="container">
         <h1>Usage Reader</h1>
         
@@ -35,6 +45,12 @@
                 <span id="zoomLevel">100%</span>
                 <button id="zoomIn">+</button>
             </div>
+        </div>
+
+        <div class="perspective-controls-ui">
+            <button id="perspectiveToggle">Perspective: Off</button>
+            <button id="applyPerspective" style="display: none;">Apply Transform</button>
+            <button id="resetPerspective" style="display: none;">Reset Corners</button>
         </div>
 
         <div class="status">
