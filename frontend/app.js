@@ -1,3 +1,34 @@
+// Immediate execution to set up global functions
+console.log('=== APP.JS LOADING ===');
+
+// Make functions globally available immediately
+window.toggleCropMode = function() {
+    console.log('Global toggleCropMode called');
+    if (typeof toggleCropModeImpl === 'function') {
+        toggleCropModeImpl();
+    } else {
+        console.error('toggleCropModeImpl not yet defined');
+    }
+};
+
+window.applyCrop = function() {
+    console.log('Global applyCrop called');
+    if (typeof applyCropImpl === 'function') {
+        applyCropImpl();
+    } else {
+        console.error('applyCropImpl not yet defined');
+    }
+};
+
+window.cancelCrop = function() {
+    console.log('Global cancelCrop called');
+    if (typeof cancelCropImpl === 'function') {
+        cancelCropImpl();
+    } else {
+        console.error('cancelCropImpl not yet defined');
+    }
+};
+
 // Application state
 let appState = {
     zoom: 1,
@@ -191,6 +222,11 @@ document.addEventListener('wheel', (e) => {
 document.addEventListener('mousedown', (e) => {
     // Don't capture if clicking on the container UI
     if (e.target.closest('.container')) return;
+    
+    // Don't interfere with crop mode
+    if (appState.cropMode) {
+        return;
+    }
     
     // Check if this is a rotate action (Shift key)
     if (e.shiftKey) {
@@ -540,8 +576,13 @@ function disablePerspectiveMode() {
     // Reset the CSS transform to remove perspective distortion
     resetPerspectivePreview();
     
-    // Optionally keep grid on or turn it off - let's keep it on for now
-    // as it might be useful for the usage reading
+    // If crop mode is active, restore the preview canvas opacity
+    if (appState.cropMode) {
+        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+        if (previewCanvas) {
+            previewCanvas.style.opacity = '1';
+        }
+    }
     
     if (isGoAvailable()) {
         callGo("SetPerspectiveMode", false);
@@ -606,7 +647,7 @@ function resetCornersToImageBounds() {
         return;
     }
     
-    // Set corners to image corners in raw pixel coordinates
+    // Set corners to full image corners in raw pixel coordinates
     appState.cornerPoints = [
         { x: 0, y: 0 },                      // top-left
         { x: appState.rawImageWidth, y: 0 }, // top-right
@@ -670,36 +711,60 @@ function startDraggingCorner(e, cornerIndex) {
     const onMouseMove = (e) => {
         if (!appState.isDraggingCorner) return;
         
-        const bounds = getImageBounds();
-        if (!bounds) return;
-        
         if (!appState.rawImageWidth || !appState.rawImageHeight) {
             return;
         }
+        
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const imgWidth = appState.rawImageWidth;
+        const imgHeight = appState.rawImageHeight;
+        
+        // Calculate base display size with 'contain' mode
+        const windowRatio = windowWidth / windowHeight;
+        const imgRatio = imgWidth / imgHeight;
+        
+        let displayWidth, displayHeight;
+        if (imgRatio > windowRatio) {
+            displayWidth = windowWidth;
+            displayHeight = windowWidth / imgRatio;
+        } else {
+            displayHeight = windowHeight;
+            displayWidth = windowHeight * imgRatio;
+        }
+        
+        // Apply zoom
+        const zoom = appState.zoom;
+        displayWidth *= zoom;
+        displayHeight *= zoom;
+        
+        // Calculate center position with pan offset
+        const centerX = windowWidth / 2 + appState.panX;
+        const centerY = windowHeight / 2 + appState.panY;
         
         // Get mouse position
         const mouseX = e.clientX;
         const mouseY = e.clientY;
         
-        // Account for rotation: transform mouse position back to unrotated image space
-        const centerX = bounds.left + bounds.width / 2;
-        const centerY = bounds.top + bounds.height / 2;
-        const rotationRad = (-appState.rotation * Math.PI) / 180; // Inverse rotation
+        // Inverse transform: subtract center, unrotate, unscale
+        const dx = mouseX - centerX;
+        const dy = mouseY - centerY;
+        
+        // Apply inverse rotation
+        const rotationRad = (-appState.rotation * Math.PI) / 180;
         const cos = Math.cos(rotationRad);
         const sin = Math.sin(rotationRad);
         
-        const dx = mouseX - centerX;
-        const dy = mouseY - centerY;
-        const unrotatedX = centerX + (dx * cos - dy * sin);
-        const unrotatedY = centerY + (dx * sin + dy * cos);
+        const unrotatedX = dx * cos - dy * sin;
+        const unrotatedY = dx * sin + dy * cos;
         
-        // Convert to relative coordinates within the image bounds
-        const relX = unrotatedX - bounds.left;
-        const relY = unrotatedY - bounds.top;
+        // Unscale (divide by half display size to get normalized -1 to 1)
+        const normX = unrotatedX / (displayWidth / 2);
+        const normY = unrotatedY / (displayHeight / 2);
         
-        // Convert from display-relative to raw image pixels
-        const rawX = (relX / bounds.width) * appState.rawImageWidth;
-        const rawY = (relY / bounds.height) * appState.rawImageHeight;
+        // Convert normalized (-1 to 1) back to raw pixel coordinates
+        const rawX = (normX / 2 + 0.5) * imgWidth;
+        const rawY = (normY / 2 + 0.5) * imgHeight;
         
         // Update corner position (raw image pixel coordinates)
         appState.cornerPoints[cornerIndex] = {
@@ -1037,32 +1102,62 @@ function hidePerspectivePreview() {
 
 // Update corner handle positions based on raw image pixel coordinates
 function updateCornerPositions() {
-    const bounds = getImageBounds();
-    if (!bounds) return;
-    
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
         console.error('Raw image dimensions not available for display');
         return;
     }
     
-    // Calculate center of image for rotation
-    const centerX = bounds.left + bounds.width / 2;
-    const centerY = bounds.top + bounds.height / 2;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const imgWidth = appState.rawImageWidth;
+    const imgHeight = appState.rawImageHeight;
+    
+    // Calculate base display size with 'contain' mode (same as getImageBounds)
+    const windowRatio = windowWidth / windowHeight;
+    const imgRatio = imgWidth / imgHeight;
+    
+    let displayWidth, displayHeight;
+    if (imgRatio > windowRatio) {
+        displayWidth = windowWidth;
+        displayHeight = windowWidth / imgRatio;
+    } else {
+        displayHeight = windowHeight;
+        displayWidth = windowHeight * imgRatio;
+    }
+    
+    // Apply zoom
+    const zoom = appState.zoom;
+    displayWidth *= zoom;
+    displayHeight *= zoom;
+    
+    // Calculate center position with pan offset
+    const centerX = windowWidth / 2 + appState.panX;
+    const centerY = windowHeight / 2 + appState.panY;
+    
+    // For CSS transforms, the order is: translate -> scale -> rotate
+    // All scaling and rotation happen around the center (transform-origin: center center)
     const rotationRad = (appState.rotation * Math.PI) / 180;
     const cos = Math.cos(rotationRad);
     const sin = Math.sin(rotationRad);
     
     cornerHandles.forEach((handle, index) => {
         const point = appState.cornerPoints[index];
-        // Convert raw image pixels to screen coordinates
-        const x = bounds.left + (point.x / appState.rawImageWidth) * bounds.width;
-        const y = bounds.top + (point.y / appState.rawImageHeight) * bounds.height;
         
-        // Apply rotation around image center
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const screenX = centerX + (dx * cos - dy * sin);
-        const screenY = centerY + (dx * sin + dy * cos);
+        // Convert raw pixel coordinates to normalized (-1 to 1) relative to image center
+        const normX = (point.x / imgWidth - 0.5) * 2;
+        const normY = (point.y / imgHeight - 0.5) * 2;
+        
+        // Apply scale
+        const scaledX = normX * displayWidth / 2;
+        const scaledY = normY * displayHeight / 2;
+        
+        // Apply rotation around center
+        const rotatedX = scaledX * cos - scaledY * sin;
+        const rotatedY = scaledX * sin + scaledY * cos;
+        
+        // Add center position (includes pan)
+        const screenX = centerX + rotatedX;
+        const screenY = centerY + rotatedY;
         
         handle.style.left = `${screenX}px`;
         handle.style.top = `${screenY}px`;
@@ -1080,31 +1175,60 @@ function drawPerspectiveLines() {
     
     if (!appState.perspectiveMode) return;
     
-    const bounds = getImageBounds();
-    if (!bounds) return;
-    
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
         return;
     }
     
-    // Calculate center of image for rotation
-    const centerX = bounds.left + bounds.width / 2;
-    const centerY = bounds.top + bounds.height / 2;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const imgWidth = appState.rawImageWidth;
+    const imgHeight = appState.rawImageHeight;
+    
+    // Calculate base display size with 'contain' mode
+    const windowRatio = windowWidth / windowHeight;
+    const imgRatio = imgWidth / imgHeight;
+    
+    let displayWidth, displayHeight;
+    if (imgRatio > windowRatio) {
+        displayWidth = windowWidth;
+        displayHeight = windowWidth / imgRatio;
+    } else {
+        displayHeight = windowHeight;
+        displayWidth = windowHeight * imgRatio;
+    }
+    
+    // Apply zoom
+    const zoom = appState.zoom;
+    displayWidth *= zoom;
+    displayHeight *= zoom;
+    
+    // Calculate center position with pan offset
+    const centerX = windowWidth / 2 + appState.panX;
+    const centerY = windowHeight / 2 + appState.panY;
+    
+    // For CSS transforms, the order is: translate -> scale -> rotate
     const rotationRad = (appState.rotation * Math.PI) / 180;
     const cos = Math.cos(rotationRad);
     const sin = Math.sin(rotationRad);
     
-    // Helper function to convert and rotate a point
+    // Helper function to convert raw image point to screen coordinates
     const getScreenPoint = (point) => {
-        const x = bounds.left + (point.x / appState.rawImageWidth) * bounds.width;
-        const y = bounds.top + (point.y / appState.rawImageHeight) * bounds.height;
+        // Convert raw pixel coordinates to normalized (-1 to 1) relative to image center
+        const normX = (point.x / imgWidth - 0.5) * 2;
+        const normY = (point.y / imgHeight - 0.5) * 2;
         
-        // Apply rotation around image center
-        const dx = x - centerX;
-        const dy = y - centerY;
+        // Apply scale
+        const scaledX = normX * displayWidth / 2;
+        const scaledY = normY * displayHeight / 2;
+        
+        // Apply rotation around center
+        const rotatedX = scaledX * cos - scaledY * sin;
+        const rotatedY = scaledX * sin + scaledY * cos;
+        
+        // Add center position (includes pan)
         return {
-            x: centerX + (dx * cos - dy * sin),
-            y: centerY + (dx * sin + dy * cos)
+            x: centerX + rotatedX,
+            y: centerY + rotatedY
         };
     };
     
@@ -1373,4 +1497,557 @@ window.addEventListener('resize', () => {
 // Initialize perspective controls
 initPerspectiveControls();
 
-console.log('Usage Reader with perspective transform initialized');
+// ============================================
+// CROP TOOL FUNCTIONS
+// ============================================
+
+// Crop tool state
+appState.cropMode = false;
+appState.cropSelection = null; // { x, y, width, height } in screen coordinates
+appState.isDrawingCrop = false;
+appState.cropStart = null;
+
+// Crop DOM elements - initialized after DOM is ready
+let cropToggle, applyCropBtn, cancelCropBtn, cropOverlay, cropSelection;
+
+function initCropElements() {
+    console.log('Initializing crop elements...');
+    cropToggle = document.getElementById('cropToggle');
+    applyCropBtn = document.getElementById('applyCrop');
+    cancelCropBtn = document.getElementById('cancelCrop');
+    cropOverlay = document.getElementById('cropOverlay');
+    cropSelection = document.getElementById('cropSelection');
+    
+    console.log('Crop elements found:');
+    console.log('  cropToggle:', !!cropToggle, cropToggle);
+    console.log('  applyCropBtn:', !!applyCropBtn, applyCropBtn);
+    console.log('  cancelCropBtn:', !!cancelCropBtn, cancelCropBtn);
+    console.log('  cropOverlay:', !!cropOverlay, cropOverlay);
+    console.log('  cropSelection:', !!cropSelection, cropSelection);
+    
+    // Add click listeners if elements exist and don't already have them
+    if (cropToggle && !cropToggle._hasClickListener) {
+        console.log('Adding click listener to cropToggle');
+        cropToggle.addEventListener('click', function(e) {
+            console.log('Crop toggle clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCropModeImpl();
+        });
+        cropToggle._hasClickListener = true;
+    }
+    
+    if (applyCropBtn && !applyCropBtn._hasClickListener) {
+        console.log('Adding click listener to applyCropBtn');
+        applyCropBtn.addEventListener('click', function(e) {
+            console.log('Apply crop clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+            applyCrop();
+        });
+        applyCropBtn._hasClickListener = true;
+    }
+    
+    if (cancelCropBtn && !cancelCropBtn._hasClickListener) {
+        console.log('Adding click listener to cancelCropBtn');
+        cancelCropBtn.addEventListener('click', function(e) {
+            console.log('Cancel crop clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+            cancelCropImpl();
+        });
+        cancelCropBtn._hasClickListener = true;
+    }
+}
+
+// Initialize crop elements immediately since script is at end of body
+initCropElements();
+
+// Also try on DOMContentLoaded just in case
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded fired');
+    if (!cropToggle) {
+        console.log('Re-initializing crop elements on DOMContentLoaded');
+        initCropElements();
+    }
+});
+
+// Toggle crop mode
+function toggleCropModeImpl() {
+    console.log('toggleCropMode called');
+    
+    // Check if an image is loaded
+    const hasImage = pageBackground.style.backgroundImage && 
+                     pageBackground.style.backgroundImage !== 'none' &&
+                     appState.originalImageBlob;
+    
+    if (!hasImage) {
+        console.log('No image loaded');
+        showNotification('Please import an image first');
+        return;
+    }
+    
+    appState.cropMode = !appState.cropMode;
+    console.log('Crop mode:', appState.cropMode);
+    
+    if (appState.cropMode) {
+        enableCropMode();
+    } else {
+        disableCropMode();
+    }
+}
+
+// Enable crop mode
+function enableCropMode() {
+    console.log('Enabling crop mode');
+    if (cropToggle) {
+        cropToggle.textContent = 'Crop: On';
+        cropToggle.classList.add('active');
+    }
+    if (applyCropBtn) applyCropBtn.style.display = 'inline-block';
+    if (cancelCropBtn) cancelCropBtn.style.display = 'inline-block';
+    if (cropOverlay) {
+        cropOverlay.style.display = 'block';
+        cropOverlay.classList.add('active');
+        // Add crop drawing event listeners
+        cropOverlay.addEventListener('mousedown', startCropDrawing);
+    }
+    document.body.classList.add('crop-mode');
+    
+    // If perspective mode is active, temporarily hide the preview canvas 
+    // so we can see the corner handles while cropping
+    if (appState.perspectiveMode) {
+        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+        if (previewCanvas) {
+            previewCanvas.style.opacity = '0.3';
+        }
+    }
+    
+    showNotification('Drag on the image to create a crop selection');
+}
+
+// Disable crop mode
+function disableCropMode() {
+    appState.cropMode = false;
+    if (cropToggle) {
+        cropToggle.textContent = 'Crop: Off';
+        cropToggle.classList.remove('active');
+    }
+    if (applyCropBtn) applyCropBtn.style.display = 'none';
+    if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+    if (cropOverlay) {
+        cropOverlay.style.display = 'none';
+        cropOverlay.classList.remove('active');
+        // Remove event listeners
+        cropOverlay.removeEventListener('mousedown', startCropDrawing);
+    }
+    document.body.classList.remove('crop-mode');
+    
+    // Clear selection
+    clearCropSelection();
+    
+    // Restore perspective preview if it was dimmed
+    if (appState.perspectiveMode) {
+        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+        if (previewCanvas) {
+            previewCanvas.style.opacity = '1';
+        }
+    }
+}
+
+// Start drawing crop selection
+function startCropDrawing(e) {
+    console.log('startCropDrawing called', e.clientX, e.clientY);
+    
+    if (!appState.cropMode) {
+        console.log('Crop mode not active, ignoring click');
+        return;
+    }
+    
+    // Don't start drawing if clicking on the container UI
+    if (e.target.closest('.container')) {
+        console.log('Click in container, ignoring');
+        return;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Clear any existing selection
+    clearCropSelection();
+    
+    appState.isDrawingCrop = true;
+    appState.cropStart = {
+        x: e.clientX,
+        y: e.clientY
+    };
+    
+    // Show selection element
+    if (cropSelection) {
+        cropSelection.style.display = 'block';
+        cropSelection.classList.add('active');
+        
+        // Set initial position
+        cropSelection.style.left = e.clientX + 'px';
+        cropSelection.style.top = e.clientY + 'px';
+        cropSelection.style.width = '0px';
+        cropSelection.style.height = '0px';
+    }
+    
+    console.log('Started crop drawing at:', appState.cropStart);
+    
+    // Add move and up listeners
+    document.addEventListener('mousemove', updateCropDrawing);
+    document.addEventListener('mouseup', endCropDrawing);
+}
+
+// Update crop selection while dragging
+function updateCropDrawing(e) {
+    if (!appState.isDrawingCrop) return;
+    
+    const startX = appState.cropStart.x;
+    const startY = appState.cropStart.y;
+    const currentX = e.clientX;
+    const currentY = e.clientY;
+    
+    // Calculate rectangle
+    const left = Math.min(startX, currentX);
+    const top = Math.min(startY, currentY);
+    const width = Math.abs(currentX - startX);
+    const height = Math.abs(currentY - startY);
+    
+    // Update selection element
+    if (cropSelection) {
+        cropSelection.style.left = left + 'px';
+        cropSelection.style.top = top + 'px';
+        cropSelection.style.width = width + 'px';
+        cropSelection.style.height = height + 'px';
+    }
+}
+
+// End drawing crop selection
+function endCropDrawing(e) {
+    if (!appState.isDrawingCrop) return;
+    
+    appState.isDrawingCrop = false;
+    
+    const startX = appState.cropStart.x;
+    const startY = appState.cropStart.y;
+    const endX = e.clientX;
+    const endY = e.clientY;
+    
+    // Store the selection
+    appState.cropSelection = {
+        x: Math.min(startX, endX),
+        y: Math.min(startY, endY),
+        width: Math.abs(endX - startX),
+        height: Math.abs(endY - startY)
+    };
+    
+    // Remove event listeners
+    document.removeEventListener('mousemove', updateCropDrawing);
+    document.removeEventListener('mouseup', endCropDrawing);
+    
+    // Only keep selection if it has meaningful size
+    if (appState.cropSelection.width < 10 || appState.cropSelection.height < 10) {
+        clearCropSelection();
+        showNotification('Selection too small, please try again');
+    } else {
+        // Add resize handles
+        addCropHandles();
+    }
+}
+
+// Add resize handles to crop selection
+function addCropHandles() {
+    if (!cropSelection) return;
+    const handles = ['tl', 'tr', 'bl', 'br'];
+    handles.forEach(pos => {
+        const handle = document.createElement('div');
+        handle.className = `crop-handle ${pos}`;
+        handle.dataset.handle = pos;
+        handle.addEventListener('mousedown', (e) => startResizeCrop(e, pos));
+        cropSelection.appendChild(handle);
+    });
+}
+
+// Start resizing crop selection
+function startResizeCrop(e, handle) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startSelection = { ...appState.cropSelection };
+    
+    function resize(e) {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        
+        let newX = startSelection.x;
+        let newY = startSelection.y;
+        let newWidth = startSelection.width;
+        let newHeight = startSelection.height;
+        
+        switch(handle) {
+            case 'tl':
+                newX = startSelection.x + dx;
+                newY = startSelection.y + dy;
+                newWidth = startSelection.width - dx;
+                newHeight = startSelection.height - dy;
+                break;
+            case 'tr':
+                newY = startSelection.y + dy;
+                newWidth = startSelection.width + dx;
+                newHeight = startSelection.height - dy;
+                break;
+            case 'bl':
+                newX = startSelection.x + dx;
+                newWidth = startSelection.width - dx;
+                newHeight = startSelection.height + dy;
+                break;
+            case 'br':
+                newWidth = startSelection.width + dx;
+                newHeight = startSelection.height + dy;
+                break;
+        }
+        
+        // Ensure minimum size
+        if (newWidth >= 10 && newHeight >= 10) {
+            appState.cropSelection = { x: newX, y: newY, width: newWidth, height: newHeight };
+            if (cropSelection) {
+                cropSelection.style.left = newX + 'px';
+                cropSelection.style.top = newY + 'px';
+                cropSelection.style.width = newWidth + 'px';
+                cropSelection.style.height = newHeight + 'px';
+            }
+        }
+    }
+    
+    function stopResize() {
+        document.removeEventListener('mousemove', resize);
+        document.removeEventListener('mouseup', stopResize);
+    }
+    
+    document.addEventListener('mousemove', resize);
+    document.addEventListener('mouseup', stopResize);
+}
+
+// Clear crop selection
+function clearCropSelection() {
+    appState.cropSelection = null;
+    if (cropSelection) {
+        cropSelection.style.display = 'none';
+        cropSelection.classList.remove('active');
+        cropSelection.innerHTML = '';
+    }
+}
+
+// Cancel crop
+function cancelCropImpl() {
+    // Hide the crop selection
+    if (cropSelection) {
+        cropSelection.style.display = 'none';
+        cropSelection.style.borderColor = '';
+        cropSelection.style.background = '';
+    }
+    
+    clearCropSelection();
+    disableCropMode();
+}
+
+// Convert screen coordinates to image coordinates
+// If perspective mode is active, this accounts for the perspective transform
+function screenToImageCoords(screenX, screenY) {
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        return null;
+    }
+    
+    // If perspective mode is active and preview is showing, we need to account
+    // for the perspective transform when converting coordinates
+    if (appState.perspectiveMode && appState.cornerPoints) {
+        return screenToImageCoordsPerspective(screenX, screenY);
+    }
+    
+    const bounds = getImageBounds();
+    if (!bounds) return null;
+    
+    // Check if point is within image bounds
+    if (screenX < bounds.left || screenX > bounds.right ||
+        screenY < bounds.top || screenY > bounds.bottom) {
+        return null;
+    }
+    
+    // Calculate normalized position within image (0-1)
+    const normX = (screenX - bounds.left) / bounds.width;
+    const normY = (screenY - bounds.top) / bounds.height;
+    
+    // Convert to raw image pixel coordinates
+    return {
+        x: normX * appState.rawImageWidth,
+        y: normY * appState.rawImageHeight
+    };
+}
+
+// Convert screen coordinates to image coordinates using perspective transform
+function screenToImageCoordsPerspective(screenX, screenY) {
+    const bounds = getImageBounds();
+    if (!bounds || !appState.cornerPoints) return null;
+    
+    // Get the four corner points in screen coordinates (convert from raw pixels)
+    const dstCorners = appState.cornerPoints.map(p => ({
+        x: bounds.left + (p.x / appState.rawImageWidth) * bounds.width,
+        y: bounds.top + (p.y / appState.rawImageHeight) * bounds.height
+    }));
+    
+    // Source rectangle corners (original image display bounds)
+    const srcCorners = [
+        { x: bounds.left, y: bounds.top },      // top-left
+        { x: bounds.right, y: bounds.top },     // top-right
+        { x: bounds.right, y: bounds.bottom },  // bottom-right
+        { x: bounds.left, y: bounds.bottom }    // bottom-left
+    ];
+    
+    // Compute inverse homography (maps screen coords back to original image)
+    const H = computeHomography(dstCorners, srcCorners);
+    const invH = invertMatrix3x3(H);
+    
+    if (!invH) return null;
+    
+    // Apply inverse homography to get source coordinate
+    const srcCoord = applyHomography(invH, screenX, screenY);
+    
+    // Check if within source bounds
+    if (srcCoord.x < bounds.left || srcCoord.x > bounds.right ||
+        srcCoord.y < bounds.top || srcCoord.y > bounds.bottom) {
+        return null;
+    }
+    
+    // Convert to normalized and then to raw pixel coordinates
+    const normX = (srcCoord.x - bounds.left) / bounds.width;
+    const normY = (srcCoord.y - bounds.top) / bounds.height;
+    
+    return {
+        x: normX * appState.rawImageWidth,
+        y: normY * appState.rawImageHeight
+    };
+}
+
+// Apply crop - this actually crops the image and updates the state
+async function applyCropImpl() {
+    if (!appState.cropSelection) {
+        showNotification('Please draw a selection first');
+        return;
+    }
+    
+    console.log('Applying crop selection:', appState.cropSelection);
+    
+    if (!window.go || !window.go.main || !window.go.main.App) {
+        showNotification('Backend not available');
+        return;
+    }
+    
+    if (!appState.originalImageBlob) {
+        showNotification('No image data available');
+        return;
+    }
+    
+    try {
+        showNotification('Applying crop...');
+        
+        // Convert screen coordinates to image coordinates
+        const topLeft = screenToImageCoords(appState.cropSelection.x, appState.cropSelection.y);
+        const bottomRight = screenToImageCoords(
+            appState.cropSelection.x + appState.cropSelection.width,
+            appState.cropSelection.y + appState.cropSelection.height
+        );
+        
+        if (!topLeft || !bottomRight) {
+            showNotification('Selection is outside image bounds');
+            return;
+        }
+        
+        // Convert base64 data URL to byte array
+        const base64Data = appState.originalImageBlob.split(',')[1];
+        const binaryString = atob(base64Data);
+        const imageData = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            imageData[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Send to backend for actual cropping
+        const croppedData = await callGo("ApplyCrop",
+            imageData,
+            Math.round(topLeft.x),
+            Math.round(topLeft.y),
+            Math.round(bottomRight.x - topLeft.x),
+            Math.round(bottomRight.y - topLeft.y)
+        );
+        
+        if (croppedData && croppedData.length > 0) {
+            // Convert cropped data back to base64
+            const base64String = btoa(String.fromCharCode.apply(null, croppedData));
+            const croppedUrl = `data:image/png;base64,${base64String}`;
+            
+            // Update background with cropped image
+            pageBackground.style.backgroundImage = `url(${croppedUrl})`;
+            
+            // Update the stored original data with the cropped version
+            appState.originalImageBlob = croppedUrl;
+            appState.originalImageData = pageBackground.style.backgroundImage;
+            
+            // Update raw dimensions after crop
+            const img = new Image();
+            img.onload = () => {
+                appState.rawImageWidth = img.naturalWidth;
+                appState.rawImageHeight = img.naturalHeight;
+                console.log('New image dimensions after crop:', appState.rawImageWidth, 'x', appState.rawImageHeight);
+                
+                // Reset corner points to the new cropped image bounds
+                resetCornersToImageBounds();
+                
+                // Update backend with new dimensions
+                if (isGoAvailable()) {
+                    callGo("SetImageDimensions", appState.rawImageWidth, appState.rawImageHeight);
+                }
+                
+                showNotification('Crop applied successfully! You can now use perspective transform on the cropped image.');
+            };
+            img.src = croppedUrl;
+            
+            // Disable crop mode after applying
+            disableCropMode();
+            
+            // Reset view
+            resetView();
+        } else {
+            showNotification('Crop failed - no data returned');
+        }
+        
+    } catch (error) {
+        console.error('Crop error:', error);
+        showNotification('Error applying crop: ' + error.message);
+    }
+}
+
+// Immediate initialization check
+console.log('=== APP.JS EXECUTING ===');
+console.log('Window toggleCropMode:', typeof window.toggleCropMode);
+console.log('Window applyCrop:', typeof window.applyCrop);
+console.log('Window cancelCrop:', typeof window.cancelCrop);
+
+// Find crop elements immediately
+cropToggle = document.getElementById('cropToggle');
+applyCropBtn = document.getElementById('applyCrop');
+cancelCropBtn = document.getElementById('cancelCrop');
+cropOverlay = document.getElementById('cropOverlay');
+cropSelection = document.getElementById('cropSelection');
+
+console.log('Crop elements found on init:');
+console.log('  cropToggle:', cropToggle ? 'YES' : 'NO', cropToggle);
+console.log('  applyCropBtn:', applyCropBtn ? 'YES' : 'NO');
+console.log('  cancelCropBtn:', cancelCropBtn ? 'YES' : 'NO');
+console.log('  cropOverlay:', cropOverlay ? 'YES' : 'NO');
+console.log('  cropSelection:', cropSelection ? 'YES' : 'NO');
+
+console.log('Usage Reader with perspective transform and crop tool initialized');

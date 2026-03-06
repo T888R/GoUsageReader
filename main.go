@@ -651,8 +651,6 @@ func (a *App) ApplyPerspectiveTransformParallel(imageData []byte, dstWidth, dstH
 	}
 
 	srcBounds := srcImg.Bounds()
-	srcWidth := srcBounds.Dx()
-	srcHeight := srcBounds.Dy()
 
 	// Create destination image
 	dstImg := image.NewRGBA(image.Rect(0, 0, dstWidth, dstHeight))
@@ -696,8 +694,8 @@ func (a *App) ApplyPerspectiveTransformParallel(imageData []byte, dstWidth, dstH
 					srcCoord := applyHomography(invH, float64(x), float64(y))
 
 					// Check if source coordinate is within bounds
-					if srcCoord.x >= 0 && srcCoord.x < float64(srcWidth) &&
-						srcCoord.y >= 0 && srcCoord.y < float64(srcHeight) {
+					if srcCoord.x >= 0 && srcCoord.x < float64(srcBounds.Dx()) &&
+						srcCoord.y >= 0 && srcCoord.y < float64(srcBounds.Dy()) {
 						// Sample pixel with bilinear interpolation
 						c := bilinearSample(srcImg, srcCoord.x, srcCoord.y, srcBounds)
 						dstImg.Set(x, y, c)
@@ -888,6 +886,60 @@ func solveLinearSystem(A [][]float64, b []float64) []float64 {
 	}
 
 	return x
+}
+
+// ApplyCrop crops an image to the specified rectangle
+// x, y are the top-left coordinates, width and height are the dimensions
+func (a *App) ApplyCrop(imageData []byte, x, y, width, height int) ([]byte, error) {
+	// Decode the source image
+	srcImg, _, err := image.Decode(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %w", err)
+	}
+
+	srcBounds := srcImg.Bounds()
+	srcWidth := srcBounds.Dx()
+	srcHeight := srcBounds.Dy()
+
+	// Validate crop bounds
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+	if x+width > srcWidth {
+		width = srcWidth - x
+	}
+	if y+height > srcHeight {
+		height = srcHeight - y
+	}
+
+	// Ensure valid dimensions
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("invalid crop dimensions")
+	}
+
+	// Create destination image
+	dstImg := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// Copy pixels from source to destination
+	for dstY := 0; dstY < height; dstY++ {
+		for dstX := 0; dstX < width; dstX++ {
+			srcX := x + dstX
+			srcY := y + dstY
+			c := srcImg.At(srcBounds.Min.X+srcX, srcBounds.Min.Y+srcY)
+			dstImg.Set(dstX, dstY, c)
+		}
+	}
+
+	// Encode result as PNG
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, dstImg); err != nil {
+		return nil, fmt.Errorf("failed to encode cropped image: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
 
 func main() {

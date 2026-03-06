@@ -670,36 +670,60 @@ function startDraggingCorner(e, cornerIndex) {
     const onMouseMove = (e) => {
         if (!appState.isDraggingCorner) return;
         
-        const bounds = getImageBounds();
-        if (!bounds) return;
-        
         if (!appState.rawImageWidth || !appState.rawImageHeight) {
             return;
         }
+        
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const imgWidth = appState.rawImageWidth;
+        const imgHeight = appState.rawImageHeight;
+        
+        // Calculate base display size with 'contain' mode
+        const windowRatio = windowWidth / windowHeight;
+        const imgRatio = imgWidth / imgHeight;
+        
+        let displayWidth, displayHeight;
+        if (imgRatio > windowRatio) {
+            displayWidth = windowWidth;
+            displayHeight = windowWidth / imgRatio;
+        } else {
+            displayHeight = windowHeight;
+            displayWidth = windowHeight * imgRatio;
+        }
+        
+        // Apply zoom
+        const zoom = appState.zoom;
+        displayWidth *= zoom;
+        displayHeight *= zoom;
+        
+        // Calculate center position with pan offset
+        const centerX = windowWidth / 2 + appState.panX;
+        const centerY = windowHeight / 2 + appState.panY;
         
         // Get mouse position
         const mouseX = e.clientX;
         const mouseY = e.clientY;
         
-        // Account for rotation: transform mouse position back to unrotated image space
-        const centerX = bounds.left + bounds.width / 2;
-        const centerY = bounds.top + bounds.height / 2;
-        const rotationRad = (-appState.rotation * Math.PI) / 180; // Inverse rotation
+        // Inverse transform: subtract center, unrotate, unscale
+        const dx = mouseX - centerX;
+        const dy = mouseY - centerY;
+        
+        // Apply inverse rotation
+        const rotationRad = (-appState.rotation * Math.PI) / 180;
         const cos = Math.cos(rotationRad);
         const sin = Math.sin(rotationRad);
         
-        const dx = mouseX - centerX;
-        const dy = mouseY - centerY;
-        const unrotatedX = centerX + (dx * cos - dy * sin);
-        const unrotatedY = centerY + (dx * sin + dy * cos);
+        const unrotatedX = dx * cos - dy * sin;
+        const unrotatedY = dx * sin + dy * cos;
         
-        // Convert to relative coordinates within the image bounds
-        const relX = unrotatedX - bounds.left;
-        const relY = unrotatedY - bounds.top;
+        // Unscale (divide by half display size to get normalized -1 to 1)
+        const normX = unrotatedX / (displayWidth / 2);
+        const normY = unrotatedY / (displayHeight / 2);
         
-        // Convert from display-relative to raw image pixels
-        const rawX = (relX / bounds.width) * appState.rawImageWidth;
-        const rawY = (relY / bounds.height) * appState.rawImageHeight;
+        // Convert normalized (-1 to 1) back to raw pixel coordinates
+        const rawX = (normX / 2 + 0.5) * imgWidth;
+        const rawY = (normY / 2 + 0.5) * imgHeight;
         
         // Update corner position (raw image pixel coordinates)
         appState.cornerPoints[cornerIndex] = {
@@ -1037,32 +1061,62 @@ function hidePerspectivePreview() {
 
 // Update corner handle positions based on raw image pixel coordinates
 function updateCornerPositions() {
-    const bounds = getImageBounds();
-    if (!bounds) return;
-    
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
         console.error('Raw image dimensions not available for display');
         return;
     }
     
-    // Calculate center of image for rotation
-    const centerX = bounds.left + bounds.width / 2;
-    const centerY = bounds.top + bounds.height / 2;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const imgWidth = appState.rawImageWidth;
+    const imgHeight = appState.rawImageHeight;
+    
+    // Calculate base display size with 'contain' mode (same as getImageBounds)
+    const windowRatio = windowWidth / windowHeight;
+    const imgRatio = imgWidth / imgHeight;
+    
+    let displayWidth, displayHeight;
+    if (imgRatio > windowRatio) {
+        displayWidth = windowWidth;
+        displayHeight = windowWidth / imgRatio;
+    } else {
+        displayHeight = windowHeight;
+        displayWidth = windowHeight * imgRatio;
+    }
+    
+    // Apply zoom
+    const zoom = appState.zoom;
+    displayWidth *= zoom;
+    displayHeight *= zoom;
+    
+    // Calculate center position with pan offset
+    const centerX = windowWidth / 2 + appState.panX;
+    const centerY = windowHeight / 2 + appState.panY;
+    
+    // For CSS transforms, the order is: translate -> scale -> rotate
+    // All scaling and rotation happen around the center (transform-origin: center center)
     const rotationRad = (appState.rotation * Math.PI) / 180;
     const cos = Math.cos(rotationRad);
     const sin = Math.sin(rotationRad);
     
     cornerHandles.forEach((handle, index) => {
         const point = appState.cornerPoints[index];
-        // Convert raw image pixels to screen coordinates
-        const x = bounds.left + (point.x / appState.rawImageWidth) * bounds.width;
-        const y = bounds.top + (point.y / appState.rawImageHeight) * bounds.height;
         
-        // Apply rotation around image center
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const screenX = centerX + (dx * cos - dy * sin);
-        const screenY = centerY + (dx * sin + dy * cos);
+        // Convert raw pixel coordinates to normalized (-1 to 1) relative to image center
+        const normX = (point.x / imgWidth - 0.5) * 2;
+        const normY = (point.y / imgHeight - 0.5) * 2;
+        
+        // Apply scale
+        const scaledX = normX * displayWidth / 2;
+        const scaledY = normY * displayHeight / 2;
+        
+        // Apply rotation around center
+        const rotatedX = scaledX * cos - scaledY * sin;
+        const rotatedY = scaledX * sin + scaledY * cos;
+        
+        // Add center position (includes pan)
+        const screenX = centerX + rotatedX;
+        const screenY = centerY + rotatedY;
         
         handle.style.left = `${screenX}px`;
         handle.style.top = `${screenY}px`;
@@ -1080,31 +1134,60 @@ function drawPerspectiveLines() {
     
     if (!appState.perspectiveMode) return;
     
-    const bounds = getImageBounds();
-    if (!bounds) return;
-    
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
         return;
     }
     
-    // Calculate center of image for rotation
-    const centerX = bounds.left + bounds.width / 2;
-    const centerY = bounds.top + bounds.height / 2;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const imgWidth = appState.rawImageWidth;
+    const imgHeight = appState.rawImageHeight;
+    
+    // Calculate base display size with 'contain' mode
+    const windowRatio = windowWidth / windowHeight;
+    const imgRatio = imgWidth / imgHeight;
+    
+    let displayWidth, displayHeight;
+    if (imgRatio > windowRatio) {
+        displayWidth = windowWidth;
+        displayHeight = windowWidth / imgRatio;
+    } else {
+        displayHeight = windowHeight;
+        displayWidth = windowHeight * imgRatio;
+    }
+    
+    // Apply zoom
+    const zoom = appState.zoom;
+    displayWidth *= zoom;
+    displayHeight *= zoom;
+    
+    // Calculate center position with pan offset
+    const centerX = windowWidth / 2 + appState.panX;
+    const centerY = windowHeight / 2 + appState.panY;
+    
+    // For CSS transforms, the order is: translate -> scale -> rotate
     const rotationRad = (appState.rotation * Math.PI) / 180;
     const cos = Math.cos(rotationRad);
     const sin = Math.sin(rotationRad);
     
-    // Helper function to convert and rotate a point
+    // Helper function to convert raw image point to screen coordinates
     const getScreenPoint = (point) => {
-        const x = bounds.left + (point.x / appState.rawImageWidth) * bounds.width;
-        const y = bounds.top + (point.y / appState.rawImageHeight) * bounds.height;
+        // Convert raw pixel coordinates to normalized (-1 to 1) relative to image center
+        const normX = (point.x / imgWidth - 0.5) * 2;
+        const normY = (point.y / imgHeight - 0.5) * 2;
         
-        // Apply rotation around image center
-        const dx = x - centerX;
-        const dy = y - centerY;
+        // Apply scale
+        const scaledX = normX * displayWidth / 2;
+        const scaledY = normY * displayHeight / 2;
+        
+        // Apply rotation around center
+        const rotatedX = scaledX * cos - scaledY * sin;
+        const rotatedY = scaledX * sin + scaledY * cos;
+        
+        // Add center position (includes pan)
         return {
-            x: centerX + (dx * cos - dy * sin),
-            y: centerY + (dx * sin + dy * cos)
+            x: centerX + rotatedX,
+            y: centerY + rotatedY
         };
     };
     

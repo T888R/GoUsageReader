@@ -19,6 +19,11 @@
         <div id="perspectiveLines"></div>
     </div>
     
+    <!-- Crop selection overlay -->
+    <div id="cropOverlay" style="display: none;">
+        <div id="cropSelection"></div>
+    </div>
+    
     <div class="container">
         <h1>Usage Reader</h1>
         
@@ -51,6 +56,12 @@
             <button id="perspectiveToggle">Perspective: Off</button>
             <button id="applyPerspective" style="display: none;">Apply Transform</button>
             <button id="resetPerspective" style="display: none;">Reset Corners</button>
+        </div>
+
+        <div class="crop-controls-ui">
+            <button id="cropToggle" onclick="console.log('Crop toggle clicked inline'); if(window.toggleCropMode) window.toggleCropMode(); else console.error('toggleCropMode not available');">Crop: Off</button>
+            <button id="applyCrop" style="display: none;" onclick="console.log('Apply crop clicked inline'); if(window.applyCrop) window.applyCrop(); else console.error('applyCrop not available');">Apply Crop</button>
+            <button id="cancelCrop" style="display: none;" onclick="console.log('Cancel crop clicked inline'); if(window.cancelCrop) window.cancelCrop(); else console.error('cancelCrop not available');">Cancel</button>
         </div>
 
         <div class="status">
