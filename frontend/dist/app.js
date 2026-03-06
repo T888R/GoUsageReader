@@ -102,6 +102,15 @@ fileInput.addEventListener('change', (e) => {
             appState.originalImageData = pageBackground.style.backgroundImage;
             appState.originalImageBlob = event.target.result;
             
+            // Get and store raw image dimensions
+            const img = new Image();
+            img.onload = () => {
+                appState.rawImageWidth = img.naturalWidth;
+                appState.rawImageHeight = img.naturalHeight;
+                console.log('Raw image dimensions:', appState.rawImageWidth, 'x', appState.rawImageHeight);
+            };
+            img.src = event.target.result;
+            
             resetView();
             showNotification('Image imported successfully. You can now use perspective transform.');
         };
@@ -118,7 +127,17 @@ function updateTransform() {
         pageBackground.style.webkitTransform = transform;
         pageBackground.style.transform = transform;
         
-        // Grid overlay stays fixed - no transform applied
+        // Also apply transform to perspective preview canvas if it exists
+        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+        if (previewCanvas && appState.perspectiveMode) {
+            previewCanvas.style.webkitTransform = transform;
+            previewCanvas.style.transform = transform;
+        }
+        
+        // Update corner positions to follow the transform
+        if (appState.perspectiveMode) {
+            updateCornerPositions();
+        }
         
         zoomLevel.textContent = `${Math.round(appState.zoom * 100)}%`;
         // Force repaint to clear artifacts in WebKit
@@ -483,16 +502,24 @@ function togglePerspectiveMode() {
             gridToggle.classList.add('active');
         }
         
-        // Reset corners to image corners on first activation
-        resetCornersToImageBounds();
+        // Wait for image dimensions to be available, then reset corners and show preview
+        const initPerspective = () => {
+            if (appState.rawImageWidth && appState.rawImageHeight) {
+                resetCornersToImageBounds();
+                updateCornerPositions();
+                applyPerspectivePreview();  // Show initial preview
+            } else {
+                // Retry after a short delay if dimensions aren't loaded yet
+                setTimeout(initPerspective, 100);
+            }
+        };
+        initPerspective();
         
         // Send to backend
         if (isGoAvailable()) {
             callGo("SetPerspectiveMode", true);
         }
         
-        updateCornerPositions();
-        applyPerspectivePreview();  // Show initial preview
         showNotification('Drag the 4 corners to align the image to the grid');
     } else {
         // Disable perspective mode
@@ -526,20 +553,14 @@ function getImageBounds() {
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
     
-    // Get the background image URL to determine its dimensions
-    const bgImage = pageBackground.style.backgroundImage;
-    if (!bgImage || bgImage === 'none') return null;
+    // Check if we have raw image dimensions stored
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        console.warn('Raw image dimensions not available');
+        return null;
+    }
     
-    // Extract image URL
-    const imageUrl = bgImage.slice(4, -1).replace(/["']/g, '');
-    
-    // Create a temporary image to get dimensions
-    const img = new Image();
-    img.src = imageUrl;
-    
-    // Get natural dimensions (if available)
-    let imgWidth = img.naturalWidth || windowWidth;
-    let imgHeight = img.naturalHeight || windowHeight;
+    const imgWidth = appState.rawImageWidth;
+    const imgHeight = appState.rawImageHeight;
     
     // Calculate display size with 'contain' mode
     const windowRatio = windowWidth / windowHeight;
@@ -580,18 +601,17 @@ function getImageBounds() {
 
 // Reset corner positions to image corners
 function resetCornersToImageBounds() {
-    const bounds = getImageBounds();
-    if (!bounds) return;
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        console.error('Raw image dimensions not available');
+        return;
+    }
     
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-    
-    // Set corners to image corners in normalized coordinates
+    // Set corners to image corners in raw pixel coordinates
     appState.cornerPoints = [
-        { x: bounds.left / windowWidth, y: bounds.top / windowHeight },       // top-left
-        { x: bounds.right / windowWidth, y: bounds.top / windowHeight },      // top-right
-        { x: bounds.right / windowWidth, y: bounds.bottom / windowHeight },  // bottom-right
-        { x: bounds.left / windowWidth, y: bounds.bottom / windowHeight }     // bottom-left
+        { x: 0, y: 0 },                      // top-left
+        { x: appState.rawImageWidth, y: 0 }, // top-right
+        { x: appState.rawImageWidth, y: appState.rawImageHeight }, // bottom-right
+        { x: 0, y: appState.rawImageHeight } // bottom-left
     ];
 }
 
@@ -650,20 +670,55 @@ function startDraggingCorner(e, cornerIndex) {
     const onMouseMove = (e) => {
         if (!appState.isDraggingCorner) return;
         
-        // Update corner position (normalized coordinates)
+        const bounds = getImageBounds();
+        if (!bounds) return;
+        
+        if (!appState.rawImageWidth || !appState.rawImageHeight) {
+            return;
+        }
+        
+        // Get mouse position
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+        
+        // Account for rotation: transform mouse position back to unrotated image space
+        const centerX = bounds.left + bounds.width / 2;
+        const centerY = bounds.top + bounds.height / 2;
+        const rotationRad = (-appState.rotation * Math.PI) / 180; // Inverse rotation
+        const cos = Math.cos(rotationRad);
+        const sin = Math.sin(rotationRad);
+        
+        const dx = mouseX - centerX;
+        const dy = mouseY - centerY;
+        const unrotatedX = centerX + (dx * cos - dy * sin);
+        const unrotatedY = centerY + (dx * sin + dy * cos);
+        
+        // Convert to relative coordinates within the image bounds
+        const relX = unrotatedX - bounds.left;
+        const relY = unrotatedY - bounds.top;
+        
+        // Convert from display-relative to raw image pixels
+        const rawX = (relX / bounds.width) * appState.rawImageWidth;
+        const rawY = (relY / bounds.height) * appState.rawImageHeight;
+        
+        // Update corner position (raw image pixel coordinates)
         appState.cornerPoints[cornerIndex] = {
-            x: e.clientX / window.innerWidth,
-            y: e.clientY / window.innerHeight
+            x: rawX,
+            y: rawY
         };
         
+        // Only update UI elements during drag (lightweight)
         updateCornerPositions();
-        applyPerspectivePreview();  // Real-time preview
+        // applyPerspectivePreview() is now only called on mouseup for performance
     };
     
     const onMouseUp = () => {
         appState.isDraggingCorner = false;
         appState.draggedCorner = null;
         handle.classList.remove('dragging');
+        
+        // Apply the perspective transform only when drag ends
+        applyPerspectivePreview();
         
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
@@ -705,10 +760,15 @@ function applyPerspectivePreview() {
         { x: bounds.left, y: bounds.bottom }    // bottom-left
     ];
     
-    // Destination corners (dragged positions)
+    // Destination corners (dragged positions) - convert from raw pixels to screen coords
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        console.error('Raw image dimensions not available for preview');
+        return;
+    }
+    
     const dstCorners = appState.cornerPoints.map(p => ({
-        x: p.x * windowWidth,
-        y: p.y * windowHeight
+        x: bounds.left + (p.x / appState.rawImageWidth) * bounds.width,
+        y: bounds.top + (p.y / appState.rawImageHeight) * bounds.height
     }));
     
     // Calculate bounding box of destination quadrilateral
@@ -975,25 +1035,42 @@ function hidePerspectivePreview() {
 }
 
 
-// Update corner handle positions based on normalized coordinates
+// Update corner handle positions based on raw image pixel coordinates
 function updateCornerPositions() {
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
+    const bounds = getImageBounds();
+    if (!bounds) return;
+    
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        console.error('Raw image dimensions not available for display');
+        return;
+    }
+    
+    // Calculate center of image for rotation
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
+    const rotationRad = (appState.rotation * Math.PI) / 180;
+    const cos = Math.cos(rotationRad);
+    const sin = Math.sin(rotationRad);
     
     cornerHandles.forEach((handle, index) => {
         const point = appState.cornerPoints[index];
-        // CSS handles centering with margin-left: -10px and margin-top: -10px
-        // so we just set left/top to the exact pixel position
-        handle.style.left = `${point.x * windowWidth}px`;
-        handle.style.top = `${point.y * windowHeight}px`;
+        // Convert raw image pixels to screen coordinates
+        const x = bounds.left + (point.x / appState.rawImageWidth) * bounds.width;
+        const y = bounds.top + (point.y / appState.rawImageHeight) * bounds.height;
+        
+        // Apply rotation around image center
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const screenX = centerX + (dx * cos - dy * sin);
+        const screenY = centerY + (dx * sin + dy * cos);
+        
+        handle.style.left = `${screenX}px`;
+        handle.style.top = `${screenY}px`;
         handle.style.right = 'auto';
         handle.style.bottom = 'auto';
     });
     
     drawPerspectiveLines();
-    
-    // Apply perspective distortion to the image
-    applyPerspectivePreview();
 }
 
 // Draw lines connecting the corners
@@ -1003,8 +1080,33 @@ function drawPerspectiveLines() {
     
     if (!appState.perspectiveMode) return;
     
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
+    const bounds = getImageBounds();
+    if (!bounds) return;
+    
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        return;
+    }
+    
+    // Calculate center of image for rotation
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
+    const rotationRad = (appState.rotation * Math.PI) / 180;
+    const cos = Math.cos(rotationRad);
+    const sin = Math.sin(rotationRad);
+    
+    // Helper function to convert and rotate a point
+    const getScreenPoint = (point) => {
+        const x = bounds.left + (point.x / appState.rawImageWidth) * bounds.width;
+        const y = bounds.top + (point.y / appState.rawImageHeight) * bounds.height;
+        
+        // Apply rotation around image center
+        const dx = x - centerX;
+        const dy = y - centerY;
+        return {
+            x: centerX + (dx * cos - dy * sin),
+            y: centerY + (dx * sin + dy * cos)
+        };
+    };
     
     // Define line pairs (connections)
     const connections = [
@@ -1012,23 +1114,17 @@ function drawPerspectiveLines() {
     ];
     
     connections.forEach(([start, end]) => {
-        const p1 = appState.cornerPoints[start];
-        const p2 = appState.cornerPoints[end];
+        const p1 = getScreenPoint(appState.cornerPoints[start]);
+        const p2 = getScreenPoint(appState.cornerPoints[end]);
         
-        // Get handle center positions
-        const x1 = p1.x * windowWidth;
-        const y1 = p1.y * windowHeight;
-        const x2 = p2.x * windowWidth;
-        const y2 = p2.y * windowHeight;
-        
-        const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        const length = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
         
         const line = document.createElement('div');
         line.className = 'perspective-line';
         line.style.width = `${length}px`;
-        line.style.left = `${x1}px`;
-        line.style.top = `${y1}px`;
+        line.style.left = `${p1.x}px`;
+        line.style.top = `${p1.y}px`;
         line.style.transform = `rotate(${angle}deg)`;
         
         linesContainer.appendChild(line);
@@ -1042,13 +1138,14 @@ function calculatePerspectiveMatrix() {
     const bounds = getImageBounds();
     if (!bounds) return null;
     
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        return null;
+    }
     
-    // Get the four corner points in screen coordinates
+    // Get the four corner points in screen coordinates (convert from raw pixels)
     const corners = appState.cornerPoints.map(p => ({
-        x: p.x * windowWidth,
-        y: p.y * windowHeight
+        x: bounds.left + (p.x / appState.rawImageWidth) * bounds.width,
+        y: bounds.top + (p.y / appState.rawImageHeight) * bounds.height
     }));
     
     // Source rectangle (the actual image bounds)
@@ -1166,12 +1263,13 @@ function resetCornerPositions() {
     // Reset corners to current image bounds
     resetCornersToImageBounds();
     
-    // Restore original image
-    if (appState.originalImageBlob) {
-        pageBackground.style.backgroundImage = `url(${appState.originalImageBlob})`;
-    }
-    
+    // Update corner positions
     updateCornerPositions();
+    
+    // Force a redraw after a short delay to ensure DOM has updated
+    requestAnimationFrame(() => {
+        updateCornerPositions();
+    });
     
     // Update the preview
     if (appState.perspectiveMode) {
@@ -1208,32 +1306,13 @@ async function applyPerspectiveTransform() {
             return;
         }
         
-        // Convert corner points to pixel coordinates relative to the original image
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        
-        // Calculate pixel coordinates relative to the displayed image bounds
-        const cornerPointsArray = appState.cornerPoints.map(p => {
-            const screenX = p.x * windowWidth;
-            const screenY = p.y * windowHeight;
-            
-            // Convert to coordinates relative to the displayed image
-            const relX = screenX - bounds.left;
-            const relY = screenY - bounds.top;
-            
-            // Scale to original image dimensions
-            const origX = (relX / bounds.width) * windowWidth;
-            const origY = (relY / bounds.height) * windowHeight;
-            
-            return [Math.round(origX), Math.round(origY)];
-        });
-        
-        // Send corner points to backend
+        // Corner points are already in raw image pixel coordinates
+        // Send them directly to backend
         await callGo("SetCornerPoints", [
-            [cornerPointsArray[0][0], cornerPointsArray[0][1]],
-            [cornerPointsArray[1][0], cornerPointsArray[1][1]],
-            [cornerPointsArray[2][0], cornerPointsArray[2][1]],
-            [cornerPointsArray[3][0], cornerPointsArray[3][1]]
+            [appState.cornerPoints[0].x, appState.cornerPoints[0].y],
+            [appState.cornerPoints[1].x, appState.cornerPoints[1].y],
+            [appState.cornerPoints[2].x, appState.cornerPoints[2].y],
+            [appState.cornerPoints[3].x, appState.cornerPoints[3].y]
         ]);
         
         // Convert base64 data URL to byte array
@@ -1244,11 +1323,11 @@ async function applyPerspectiveTransform() {
             imageData[i] = binaryString.charCodeAt(i);
         }
         
-        // Send to backend for transformation
+        // Send to backend for transformation with raw image dimensions
         const transformedData = await callGo("ApplyPerspectiveTransform", 
             imageData,
-            window.innerWidth,
-            window.innerHeight
+            appState.rawImageWidth,
+            appState.rawImageHeight
         );
         
         if (transformedData && transformedData.length > 0) {
