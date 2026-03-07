@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	_ "image/jpeg" // Register JPEG decoder
 	"image/png"
 	"math"
 	"strconv"
@@ -891,11 +892,27 @@ func solveLinearSystem(A [][]float64, b []float64) []float64 {
 // ApplyCrop crops an image to the specified rectangle
 // x, y are the top-left coordinates, width and height are the dimensions
 func (a *App) ApplyCrop(imageData []byte, x, y, width, height int) ([]byte, error) {
+	// Log received data info
+	fmt.Printf("ApplyCrop received: %d bytes, crop region: (%d,%d,%d,%d)\n", len(imageData), x, y, width, height)
+
+	if len(imageData) < 10 {
+		return nil, fmt.Errorf("image data too small: %d bytes", len(imageData))
+	}
+
+	// Log first bytes to check format
+	fmt.Printf("First 10 bytes: %v\n", imageData[:10])
+
+	// Check for PNG signature
+	isPNG := len(imageData) > 8 && imageData[0] == 137 && imageData[1] == 80 && imageData[2] == 78 && imageData[3] == 71
+	isJPEG := len(imageData) > 2 && imageData[0] == 255 && imageData[1] == 216
+	fmt.Printf("Detected format - PNG: %v, JPEG: %v\n", isPNG, isJPEG)
+
 	// Decode the source image
-	srcImg, _, err := image.Decode(bytes.NewReader(imageData))
+	srcImg, format, err := image.Decode(bytes.NewReader(imageData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode image: %w", err)
 	}
+	fmt.Printf("Successfully decoded %s image\n", format)
 
 	srcBounds := srcImg.Bounds()
 	srcWidth := srcBounds.Dx()

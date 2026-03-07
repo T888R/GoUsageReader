@@ -1,5 +1,11 @@
-// Application state
-let appState = {
+console.log('APP.JS STARTING TO LOAD - Line 1');
+
+// Application state - use window.appState to make it global
+if (!window.appState) {
+    window.appState = {};
+}
+window.appState = {
+    ...window.appState,
     zoom: 1,
     panX: 0,
     panY: 0,
@@ -13,6 +19,8 @@ let appState = {
     gridEnabled: false,
     isShiftHeld: false,
     perspectiveMode: false,
+    cropMode: false,
+    isTogglingCrop: false,
     cornerPoints: [
         { x: 0.1, y: 0.1 }, // top-left (normalized 0-1)
         { x: 0.9, y: 0.1 }, // top-right
@@ -24,6 +32,9 @@ let appState = {
     originalImageData: null,
     originalImageBlob: null // Store the actual blob data for transforms
 };
+
+// Create local reference
+let appState = window.appState;
 
 // DOM elements
 const pageBackground = document.getElementById('pageBackground');
@@ -65,12 +76,19 @@ if (isGoAvailable()) {
 
 // Helper function to call Go methods safely
 async function callGo(methodName, ...args) {
-    if (!GoApp || !GoApp[methodName]) {
-        console.warn(`Go method ${methodName} not available`);
+    // Always check window.go directly in case it loaded after script initialization
+    if (!window.go || !window.go.main || !window.go.main.App) {
+        console.warn(`Go runtime not available for ${methodName}`);
         return null;
     }
+    
+    if (!window.go.main.App[methodName]) {
+        console.warn(`Go method ${methodName} not found. Available:`, Object.keys(window.go.main.App));
+        return null;
+    }
+    
     try {
-        return await GoApp[methodName](...args);
+        return await window.go.main.App[methodName](...args);
     } catch (err) {
         console.error(`Error calling ${methodName}:`, err);
         throw err;
@@ -191,6 +209,11 @@ document.addEventListener('wheel', (e) => {
 document.addEventListener('mousedown', (e) => {
     // Don't capture if clicking on the container UI
     if (e.target.closest('.container')) return;
+    
+    // Don't interfere with crop mode
+    if (appState.cropMode) {
+        return;
+    }
     
     // Check if this is a rotate action (Shift key)
     if (e.shiftKey) {
@@ -540,8 +563,13 @@ function disablePerspectiveMode() {
     // Reset the CSS transform to remove perspective distortion
     resetPerspectivePreview();
     
-    // Optionally keep grid on or turn it off - let's keep it on for now
-    // as it might be useful for the usage reading
+    // If crop mode is active, restore the preview canvas opacity
+    if (appState.cropMode) {
+        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+        if (previewCanvas) {
+            previewCanvas.style.opacity = '1';
+        }
+    }
     
     if (isGoAvailable()) {
         callGo("SetPerspectiveMode", false);
@@ -606,7 +634,7 @@ function resetCornersToImageBounds() {
         return;
     }
     
-    // Set corners to image corners in raw pixel coordinates
+    // Set corners to full image corners in raw pixel coordinates
     appState.cornerPoints = [
         { x: 0, y: 0 },                      // top-left
         { x: appState.rawImageWidth, y: 0 }, // top-right
@@ -1456,4 +1484,745 @@ window.addEventListener('resize', () => {
 // Initialize perspective controls
 initPerspectiveControls();
 
-console.log('Usage Reader with perspective transform initialized');
+// ============================================
+// CROP TOOL FUNCTIONS
+// ============================================
+
+// Crop tool state
+appState.cropMode = false;
+appState.cropSelection = null; // { x, y, width, height } in screen coordinates
+appState.isDrawingCrop = false;
+appState.cropStart = null;
+
+// Crop DOM elements - initialized after DOM is ready
+let cropToggle, applyCropBtn, cancelCropBtn, cropOverlay, cropSelection;
+
+function initCropElements() {
+    console.log('Initializing crop elements...');
+    cropToggle = document.getElementById('cropToggle');
+    applyCropBtn = document.getElementById('applyCrop');
+    cancelCropBtn = document.getElementById('cancelCrop');
+    cropOverlay = document.getElementById('cropOverlay');
+    cropSelection = document.getElementById('cropSelection');
+    
+    console.log('Crop elements found:');
+    console.log('  cropToggle:', !!cropToggle, cropToggle);
+    console.log('  applyCropBtn:', !!applyCropBtn, applyCropBtn);
+    console.log('  cancelCropBtn:', !!cancelCropBtn, cancelCropBtn);
+    console.log('  cropOverlay:', !!cropOverlay, cropOverlay);
+    console.log('  cropSelection:', !!cropSelection, cropSelection);
+    
+    // Add click listeners if elements exist and don't already have them
+    if (cropToggle && !cropToggle._hasClickListener) {
+        console.log('Adding click listener to cropToggle');
+        cropToggle.addEventListener('click', function(e) {
+            console.log('Crop toggle clicked! Target:', e.target.id, 'Current mode:', appState.cropMode);
+            e.preventDefault();
+            e.stopPropagation();
+            // Only toggle if not already processing
+            if (!appState.isTogglingCrop) {
+                console.log('Proceeding with toggle');
+                toggleCropModeImpl();
+            } else {
+                console.log('Already toggling, ignoring click');
+            }
+        });
+        cropToggle._hasClickListener = true;
+        console.log('Click listener added successfully');
+    } else if (cropToggle) {
+        console.log('cropToggle already has click listener');
+    }
+    
+    if (applyCropBtn && !applyCropBtn._hasClickListener) {
+        console.log('Adding click listener to applyCropBtn');
+        applyCropBtn.addEventListener('click', function(e) {
+            console.log('=== APPLY CROP BUTTON CLICKED ===');
+            console.log('Event target:', e.target.id);
+            console.log('cropSelection exists:', !!appState.cropSelection);
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Calling applyCropImpl...');
+            applyCropImpl().then(() => {
+                console.log('applyCropImpl completed');
+            }).catch(err => {
+                console.error('applyCropImpl error:', err);
+            });
+        });
+        applyCropBtn._hasClickListener = true;
+        console.log('Apply crop button listener attached successfully');
+    }
+    
+    if (cancelCropBtn && !cancelCropBtn._hasClickListener) {
+        console.log('Adding click listener to cancelCropBtn');
+        cancelCropBtn.addEventListener('click', function(e) {
+            console.log('Cancel crop clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+            cancelCropImpl();
+        });
+        cancelCropBtn._hasClickListener = true;
+    }
+}
+
+// Initialize crop elements immediately since script is at end of body
+let cropElementsInitialized = false;
+function initCropElementsOnce() {
+    if (cropElementsInitialized) {
+        console.log('Crop elements already initialized, skipping');
+        return;
+    }
+    cropElementsInitialized = true;
+    initCropElements();
+}
+
+// Initialize immediately
+initCropElementsOnce();
+
+// Also try on DOMContentLoaded just in case
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded fired');
+    initCropElementsOnce();
+});
+
+// Toggle crop mode
+function toggleCropModeImpl() {
+    console.log('toggleCropModeImpl called, current state:', appState.cropMode);
+    
+    // Check if an image is loaded
+    const hasImage = pageBackground.style.backgroundImage && 
+                     pageBackground.style.backgroundImage !== 'none' &&
+                     appState.originalImageBlob;
+    
+    if (!hasImage) {
+        console.log('No image loaded');
+        showNotification('Please import an image first');
+        return;
+    }
+    
+    // Prevent double-toggle by checking if we're already in the middle of toggling
+    if (appState.isTogglingCrop) {
+        console.log('Already toggling, ignoring');
+        return;
+    }
+    
+    appState.isTogglingCrop = true;
+    
+    appState.cropMode = !appState.cropMode;
+    console.log('Crop mode changed to:', appState.cropMode);
+    
+    if (appState.cropMode) {
+        enableCropMode();
+    } else {
+        disableCropMode();
+    }
+    
+    // Reset toggle lock after a short delay
+    setTimeout(() => {
+        appState.isTogglingCrop = false;
+    }, 100);
+}
+
+// Enable crop mode
+function enableCropMode() {
+    console.log('Enabling crop mode');
+    if (cropToggle) {
+        cropToggle.textContent = 'Crop: On';
+        cropToggle.classList.add('active');
+    }
+    if (applyCropBtn) applyCropBtn.style.display = 'inline-block';
+    if (cancelCropBtn) cancelCropBtn.style.display = 'inline-block';
+    if (cropOverlay) {
+        console.log('Setting up crop overlay');
+        console.log('cropOverlay element:', cropOverlay);
+        console.log('cropOverlay classList before:', cropOverlay.classList.toString());
+        
+        // Force styles directly on the element - use z-index below container (1000) so buttons remain clickable
+        cropOverlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 100; pointer-events: auto; cursor: crosshair; background: transparent;';
+        cropOverlay.style.display = 'block';
+        cropOverlay.classList.add('active');
+        
+        console.log('cropOverlay classList after:', cropOverlay.classList.toString());
+        console.log('cropOverlay computed z-index:', window.getComputedStyle(cropOverlay).zIndex);
+        console.log('cropOverlay computed pointer-events:', window.getComputedStyle(cropOverlay).pointerEvents);
+        
+        // Add crop drawing event listeners
+        cropOverlay.addEventListener('mousedown', startCropDrawing);
+        console.log('Added mousedown listener to cropOverlay');
+        console.log('Try clicking and dragging on the screen now!');
+    } else {
+        console.error('cropOverlay element not found!');
+    }
+    document.body.classList.add('crop-mode');
+    
+    // If perspective mode is active, temporarily hide the preview canvas 
+    // so we can see the corner handles while cropping
+    if (appState.perspectiveMode) {
+        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+        if (previewCanvas) {
+            previewCanvas.style.opacity = '0.3';
+        }
+    }
+    
+    showNotification('Drag on the image to create a crop selection');
+}
+
+// Disable crop mode
+function disableCropMode() {
+    appState.cropMode = false;
+    if (cropToggle) {
+        cropToggle.textContent = 'Crop: Off';
+        cropToggle.classList.remove('active');
+    }
+    if (applyCropBtn) applyCropBtn.style.display = 'none';
+    if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+    if (cropOverlay) {
+        cropOverlay.style.display = 'none';
+        cropOverlay.classList.remove('active');
+        // Remove event listeners
+        cropOverlay.removeEventListener('mousedown', startCropDrawing);
+    }
+    document.body.classList.remove('crop-mode');
+    
+    // Clear selection
+    clearCropSelection();
+    
+    // Restore perspective preview if it was dimmed
+    if (appState.perspectiveMode) {
+        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+        if (previewCanvas) {
+            previewCanvas.style.opacity = '1';
+        }
+    }
+}
+
+// Start drawing crop selection
+function startCropDrawing(e) {
+    console.log('startCropDrawing called at', e.clientX, e.clientY, 'target:', e.target.id || e.target.className);
+    
+    if (!appState.cropMode) {
+        console.log('Crop mode not active, ignoring click');
+        return;
+    }
+    
+    // Don't start drawing if clicking on the container UI
+    if (e.target.closest('.container')) {
+        console.log('Click in container, ignoring');
+        return;
+    }
+    
+    // Only allow drawing when clicking on the actual image background
+    // Check if click is within the image bounds
+    const imageBounds = getImageBounds();
+    if (!imageBounds) {
+        console.log('No image bounds available');
+        return;
+    }
+    
+    const clickX = e.clientX;
+    const clickY = e.clientY;
+    
+    // Check if click is within image area
+    if (clickX < imageBounds.left || clickX > imageBounds.right ||
+        clickY < imageBounds.top || clickY > imageBounds.bottom) {
+        console.log('Click outside image bounds, ignoring');
+        console.log('Click:', clickX, clickY, 'Image bounds:', imageBounds);
+        return;
+    }
+    
+    console.log('Click is within image bounds, starting selection');
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Clear any existing selection
+    clearCropSelection();
+    
+    appState.isDrawingCrop = true;
+    appState.cropStart = {
+        x: e.clientX,
+        y: e.clientY
+    };
+    
+    // Show selection element
+    if (cropSelection) {
+        cropSelection.style.display = 'block';
+        cropSelection.classList.add('active');
+        
+        // Set initial position
+        cropSelection.style.left = e.clientX + 'px';
+        cropSelection.style.top = e.clientY + 'px';
+        cropSelection.style.width = '0px';
+        cropSelection.style.height = '0px';
+    }
+    
+    console.log('Started crop drawing at:', appState.cropStart);
+    
+    // Add move and up listeners
+    document.addEventListener('mousemove', updateCropDrawing);
+    document.addEventListener('mouseup', endCropDrawing);
+}
+
+// Update crop selection while dragging
+function updateCropDrawing(e) {
+    if (!appState.isDrawingCrop) return;
+    
+    const startX = appState.cropStart.x;
+    const startY = appState.cropStart.y;
+    const currentX = e.clientX;
+    const currentY = e.clientY;
+    
+    // Calculate rectangle
+    const left = Math.min(startX, currentX);
+    const top = Math.min(startY, currentY);
+    const width = Math.abs(currentX - startX);
+    const height = Math.abs(currentY - startY);
+    
+    // Update selection element
+    if (cropSelection) {
+        cropSelection.style.left = left + 'px';
+        cropSelection.style.top = top + 'px';
+        cropSelection.style.width = width + 'px';
+        cropSelection.style.height = height + 'px';
+        // Ensure selection is visible
+        cropSelection.style.display = 'block';
+        cropSelection.style.zIndex = '10000';
+    }
+}
+
+// End drawing crop selection
+function endCropDrawing(e) {
+    console.log('endCropDrawing called');
+    if (!appState.isDrawingCrop) {
+        console.log('Not drawing, ignoring');
+        return;
+    }
+    
+    appState.isDrawingCrop = false;
+    
+    const startX = appState.cropStart.x;
+    const startY = appState.cropStart.y;
+    const endX = e.clientX;
+    const endY = e.clientY;
+    
+    console.log('Start:', startX, startY, 'End:', endX, endY);
+    
+    // Store the selection
+    appState.cropSelection = {
+        x: Math.min(startX, endX),
+        y: Math.min(startY, endY),
+        width: Math.abs(endX - startX),
+        height: Math.abs(endY - startY)
+    };
+    
+    console.log('Selection:', appState.cropSelection);
+    
+    // Remove event listeners
+    document.removeEventListener('mousemove', updateCropDrawing);
+    document.removeEventListener('mouseup', endCropDrawing);
+    
+    // Only keep selection if it has meaningful size (lowered to 5 pixels)
+    if (appState.cropSelection.width < 5 || appState.cropSelection.height < 5) {
+        console.log('Selection too small:', appState.cropSelection.width, 'x', appState.cropSelection.height);
+        clearCropSelection();
+        showNotification('Selection too small, please try again');
+    } else {
+        console.log('Selection accepted, adding handles');
+        // Add resize handles
+        addCropHandles();
+        showNotification('Selection created! Click Apply Crop to crop the image.');
+    }
+}
+
+// Add resize handles to crop selection
+function addCropHandles() {
+    if (!cropSelection) return;
+    const handles = ['tl', 'tr', 'bl', 'br'];
+    handles.forEach(pos => {
+        const handle = document.createElement('div');
+        handle.className = `crop-handle ${pos}`;
+        handle.dataset.handle = pos;
+        handle.addEventListener('mousedown', (e) => startResizeCrop(e, pos));
+        cropSelection.appendChild(handle);
+    });
+}
+
+// Start resizing crop selection
+function startResizeCrop(e, handle) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startSelection = { ...appState.cropSelection };
+    
+    function resize(e) {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        
+        let newX = startSelection.x;
+        let newY = startSelection.y;
+        let newWidth = startSelection.width;
+        let newHeight = startSelection.height;
+        
+        switch(handle) {
+            case 'tl':
+                newX = startSelection.x + dx;
+                newY = startSelection.y + dy;
+                newWidth = startSelection.width - dx;
+                newHeight = startSelection.height - dy;
+                break;
+            case 'tr':
+                newY = startSelection.y + dy;
+                newWidth = startSelection.width + dx;
+                newHeight = startSelection.height - dy;
+                break;
+            case 'bl':
+                newX = startSelection.x + dx;
+                newWidth = startSelection.width - dx;
+                newHeight = startSelection.height + dy;
+                break;
+            case 'br':
+                newWidth = startSelection.width + dx;
+                newHeight = startSelection.height + dy;
+                break;
+        }
+        
+        // Ensure minimum size
+        if (newWidth >= 10 && newHeight >= 10) {
+            appState.cropSelection = { x: newX, y: newY, width: newWidth, height: newHeight };
+            if (cropSelection) {
+                cropSelection.style.left = newX + 'px';
+                cropSelection.style.top = newY + 'px';
+                cropSelection.style.width = newWidth + 'px';
+                cropSelection.style.height = newHeight + 'px';
+            }
+        }
+    }
+    
+    function stopResize() {
+        document.removeEventListener('mousemove', resize);
+        document.removeEventListener('mouseup', stopResize);
+    }
+    
+    document.addEventListener('mousemove', resize);
+    document.addEventListener('mouseup', stopResize);
+}
+
+// Clear crop selection
+function clearCropSelection() {
+    appState.cropSelection = null;
+    if (cropSelection) {
+        cropSelection.style.display = 'none';
+        cropSelection.classList.remove('active');
+        cropSelection.innerHTML = '';
+    }
+}
+
+// Cancel crop
+function cancelCropImpl() {
+    // Hide the crop selection
+    if (cropSelection) {
+        cropSelection.style.display = 'none';
+        cropSelection.style.borderColor = '';
+        cropSelection.style.background = '';
+    }
+    
+    clearCropSelection();
+    disableCropMode();
+}
+
+// Convert screen coordinates to image coordinates
+// If perspective mode is active, this accounts for the perspective transform
+function screenToImageCoords(screenX, screenY) {
+    if (!appState.rawImageWidth || !appState.rawImageHeight) {
+        return null;
+    }
+    
+    // If perspective mode is active and preview is showing, we need to account
+    // for the perspective transform when converting coordinates
+    if (appState.perspectiveMode && appState.cornerPoints) {
+        return screenToImageCoordsPerspective(screenX, screenY);
+    }
+    
+    const bounds = getImageBounds();
+    if (!bounds) return null;
+    
+    // Check if point is within image bounds
+    if (screenX < bounds.left || screenX > bounds.right ||
+        screenY < bounds.top || screenY > bounds.bottom) {
+        return null;
+    }
+    
+    // Calculate normalized position within image (0-1)
+    const normX = (screenX - bounds.left) / bounds.width;
+    const normY = (screenY - bounds.top) / bounds.height;
+    
+    // Convert to raw image pixel coordinates
+    return {
+        x: normX * appState.rawImageWidth,
+        y: normY * appState.rawImageHeight
+    };
+}
+
+// Convert screen coordinates to image coordinates using perspective transform
+function screenToImageCoordsPerspective(screenX, screenY) {
+    const bounds = getImageBounds();
+    if (!bounds || !appState.cornerPoints) return null;
+    
+    // Get the four corner points in screen coordinates (convert from raw pixels)
+    const dstCorners = appState.cornerPoints.map(p => ({
+        x: bounds.left + (p.x / appState.rawImageWidth) * bounds.width,
+        y: bounds.top + (p.y / appState.rawImageHeight) * bounds.height
+    }));
+    
+    // Source rectangle corners (original image display bounds)
+    const srcCorners = [
+        { x: bounds.left, y: bounds.top },      // top-left
+        { x: bounds.right, y: bounds.top },     // top-right
+        { x: bounds.right, y: bounds.bottom },  // bottom-right
+        { x: bounds.left, y: bounds.bottom }    // bottom-left
+    ];
+    
+    // Compute inverse homography (maps screen coords back to original image)
+    const H = computeHomography(dstCorners, srcCorners);
+    const invH = invertMatrix3x3(H);
+    
+    if (!invH) return null;
+    
+    // Apply inverse homography to get source coordinate
+    const srcCoord = applyHomography(invH, screenX, screenY);
+    
+    // Check if within source bounds
+    if (srcCoord.x < bounds.left || srcCoord.x > bounds.right ||
+        srcCoord.y < bounds.top || srcCoord.y > bounds.bottom) {
+        return null;
+    }
+    
+    // Convert to normalized and then to raw pixel coordinates
+    const normX = (srcCoord.x - bounds.left) / bounds.width;
+    const normY = (srcCoord.y - bounds.top) / bounds.height;
+    
+    return {
+        x: normX * appState.rawImageWidth,
+        y: normY * appState.rawImageHeight
+    };
+}
+
+// Apply crop - this actually crops the image and updates the state
+async function applyCropImpl() {
+    console.log('=== APPLY CROP STARTED ===');
+    console.log('cropSelection:', appState.cropSelection);
+    console.log('originalImageBlob available:', !!appState.originalImageBlob);
+    console.log('window.go exists:', !!window.go);
+    console.log('window.go.main exists:', !!(window.go && window.go.main));
+    console.log('window.go.main.App exists:', !!(window.go && window.go.main && window.go.main.App));
+    
+    // Check what methods are available
+    if (window.go && window.go.main && window.go.main.App) {
+        console.log('Available methods in App:', Object.keys(window.go.main.App));
+        console.log('ApplyCrop method exists:', typeof window.go.main.App.ApplyCrop);
+    }
+    
+    if (!appState.cropSelection) {
+        console.log('ERROR: No crop selection');
+        showNotification('Please draw a selection first');
+        return;
+    }
+    
+    if (!window.go || !window.go.main || !window.go.main.App) {
+        console.log('ERROR: Backend not available');
+        showNotification('Backend not available - Go runtime not loaded');
+        return;
+    }
+    
+    if (!window.go.main.App.ApplyCrop) {
+        console.log('ERROR: ApplyCrop method not found in backend');
+        showNotification('Backend method not available - please restart the app');
+        return;
+    }
+    
+    if (!appState.originalImageBlob) {
+        console.log('ERROR: No image data');
+        showNotification('No image data available');
+        return;
+    }
+    
+    try {
+        console.log('Converting coordinates...');
+        showNotification('Applying crop...');
+        
+        // Convert screen coordinates to image coordinates
+        console.log('Selection coordinates:', appState.cropSelection);
+        const topLeft = screenToImageCoords(appState.cropSelection.x, appState.cropSelection.y);
+        const bottomRight = screenToImageCoords(
+            appState.cropSelection.x + appState.cropSelection.width,
+            appState.cropSelection.y + appState.cropSelection.height
+        );
+        
+        console.log('topLeft:', topLeft);
+        console.log('bottomRight:', bottomRight);
+        
+        if (!topLeft || !bottomRight) {
+            console.log('ERROR: Coordinates outside bounds');
+            showNotification('Selection is outside image bounds');
+            return;
+        }
+        
+        console.log('Converting image data...');
+        // Convert base64 data URL to byte array properly
+        const base64Data = appState.originalImageBlob.split(',')[1];
+        console.log('Base64 data length:', base64Data.length);
+        console.log('First 50 chars of base64:', base64Data.substring(0, 50));
+        
+        // Decode base64 to binary
+        const binaryString = atob(base64Data);
+        console.log('Binary string length:', binaryString.length);
+        
+        // Check first few bytes to identify format
+        const firstBytes = [];
+        for (let i = 0; i < Math.min(10, binaryString.length); i++) {
+            firstBytes.push(binaryString.charCodeAt(i));
+        }
+        console.log('First 10 bytes:', firstBytes);
+        
+        // Check for PNG signature (137 80 78 71 13 10 26 10)
+        const isPNG = firstBytes[0] === 137 && firstBytes[1] === 80 && firstBytes[2] === 78 && firstBytes[3] === 71;
+        const isJPEG = firstBytes[0] === 255 && firstBytes[1] === 216;
+        console.log('Is PNG:', isPNG, 'Is JPEG:', isJPEG);
+        
+        // Create array directly from binary string
+        const imageData = [];
+        for (let i = 0; i < binaryString.length; i++) {
+            imageData.push(binaryString.charCodeAt(i) & 0xFF);
+        }
+        console.log('Image data converted, size:', imageData.length);
+        
+        console.log('Calling backend ApplyCrop with params:');
+        console.log('  x:', Math.round(topLeft.x));
+        console.log('  y:', Math.round(topLeft.y));
+        console.log('  width:', Math.round(bottomRight.x - topLeft.x));
+        console.log('  height:', Math.round(bottomRight.y - topLeft.y));
+        
+        // Send to backend for actual cropping
+        const croppedData = await callGo("ApplyCrop",
+            imageData,
+            Math.round(topLeft.x),
+            Math.round(topLeft.y),
+            Math.round(bottomRight.x - topLeft.x),
+            Math.round(bottomRight.y - topLeft.y)
+        );
+        
+        console.log('Backend returned cropped data:', croppedData ? 'YES' : 'NO');
+        console.log('Cropped data length:', croppedData ? croppedData.length : 0);
+        
+        if (croppedData && croppedData.length > 0) {
+            console.log('Processing cropped image...');
+            // Check first bytes to identify format
+            let firstBytes = [];
+            for (let i = 0; i < Math.min(10, croppedData.length); i++) {
+                firstBytes.push(croppedData[i]);
+            }
+            console.log('First 10 bytes of cropped data:', firstBytes);
+            const isPNG = firstBytes[0] === 137 && firstBytes[1] === 80 && firstBytes[2] === 78 && firstBytes[3] === 71;
+            console.log('Is PNG format:', isPNG);
+            
+            // Convert cropped data back to base64
+            // Handle both array formats from Go
+            let croppedArray;
+            if (Array.isArray(croppedData)) {
+                croppedArray = croppedData;
+            } else if (croppedData instanceof Uint8Array || croppedData instanceof ArrayBuffer) {
+                croppedArray = Array.from(croppedData);
+            } else {
+                // Try to convert to array
+                croppedArray = Array.prototype.slice.call(croppedData);
+            }
+            console.log('Cropped array type:', typeof croppedArray, 'length:', croppedArray.length);
+            
+            // Convert byte array to binary string safely
+            let binaryString = '';
+            for (let i = 0; i < croppedArray.length; i++) {
+                binaryString += String.fromCharCode(croppedArray[i] & 0xFF);
+            }
+            
+            const base64String = btoa(binaryString);
+            const croppedUrl = `data:image/png;base64,${base64String}`;
+            console.log('Cropped URL created, length:', croppedUrl.length);
+            console.log('Setting background image...');
+            
+            // First verify the image loads
+            const testImg = new Image();
+            testImg.onload = () => {
+                console.log('Cropped image loaded successfully:', testImg.naturalWidth, 'x', testImg.naturalHeight);
+                
+                // Now update the background
+                pageBackground.style.backgroundImage = `url(${croppedUrl})`;
+                pageBackground.style.backgroundSize = 'contain';
+                pageBackground.style.backgroundRepeat = 'no-repeat';
+                pageBackground.style.backgroundPosition = 'center center';
+                pageBackground.style.opacity = '1';
+                
+                // Update the stored original data with the cropped version
+                appState.originalImageBlob = croppedUrl;
+                appState.originalImageData = pageBackground.style.backgroundImage;
+                
+                // Update raw dimensions after crop
+                appState.rawImageWidth = testImg.naturalWidth;
+                appState.rawImageHeight = testImg.naturalHeight;
+                
+                // Reset corner points to the new cropped image bounds
+                resetCornersToImageBounds();
+                
+                // Update backend with new dimensions
+                if (isGoAvailable()) {
+                    callGo("SetImageDimensions", appState.rawImageWidth, appState.rawImageHeight);
+                }
+                
+                // Disable crop mode after applying
+                disableCropMode();
+                
+                // Reset view
+                resetView();
+                
+                showNotification('Crop applied successfully!');
+            };
+            testImg.onerror = (err) => {
+                console.error('Failed to load cropped image:', err);
+                showNotification('Error: Failed to load cropped image');
+            };
+            testImg.src = croppedUrl;
+        } else {
+            showNotification('Crop failed - no data returned');
+        }
+        
+    } catch (error) {
+        console.error('Crop error:', error);
+        showNotification('Error applying crop: ' + error.message);
+    }
+}
+
+// Immediate initialization check
+console.log('=== APP.JS EXECUTING ===');
+console.log('Window toggleCropMode:', typeof window.toggleCropMode);
+console.log('Window applyCrop:', typeof window.applyCrop);
+console.log('Window cancelCrop:', typeof window.cancelCrop);
+
+// Find crop elements immediately
+cropToggle = document.getElementById('cropToggle');
+applyCropBtn = document.getElementById('applyCrop');
+cancelCropBtn = document.getElementById('cancelCrop');
+cropOverlay = document.getElementById('cropOverlay');
+cropSelection = document.getElementById('cropSelection');
+
+console.log('Crop elements found on init:');
+console.log('  cropToggle:', cropToggle ? 'YES' : 'NO', cropToggle);
+console.log('  applyCropBtn:', applyCropBtn ? 'YES' : 'NO');
+console.log('  cancelCropBtn:', cancelCropBtn ? 'YES' : 'NO');
+console.log('  cropOverlay:', cropOverlay ? 'YES' : 'NO');
+console.log('  cropSelection:', cropSelection ? 'YES' : 'NO');
+
+console.log('Checking if crop functions are defined:');
+console.log('  toggleCropModeImpl:', typeof toggleCropModeImpl);
+console.log('  applyCropImpl:', typeof applyCropImpl);
+console.log('  cancelCropImpl:', typeof cancelCropImpl);
+console.log('Usage Reader with perspective transform and crop tool initialized');

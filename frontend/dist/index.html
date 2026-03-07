@@ -59,9 +59,9 @@
         </div>
 
         <div class="crop-controls-ui">
-            <button id="cropToggle" onclick="console.log('Crop toggle clicked inline'); if(window.toggleCropMode) window.toggleCropMode(); else console.error('toggleCropMode not available');">Crop: Off</button>
-            <button id="applyCrop" style="display: none;" onclick="console.log('Apply crop clicked inline'); if(window.applyCrop) window.applyCrop(); else console.error('applyCrop not available');">Apply Crop</button>
-            <button id="cancelCrop" style="display: none;" onclick="console.log('Cancel crop clicked inline'); if(window.cancelCrop) window.cancelCrop(); else console.error('cancelCrop not available');">Cancel</button>
+            <button id="cropToggle">Crop: Off</button>
+            <button id="applyCrop" style="display: none;">Apply Crop</button>
+            <button id="cancelCrop" style="display: none;">Cancel</button>
         </div>
 
         <div class="status">
@@ -74,6 +74,55 @@
     </div>
 
     <script src="runtime.js"></script>
+    <script>
+        // Wait for Wails runtime to be ready
+        window.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                console.log('=== CHECKING WAILS RUNTIME ===');
+                console.log('window.go:', !!window.go);
+                if (window.go && window.go.main && window.go.main.App) {
+                    console.log('Available methods:', Object.keys(window.go.main.App).sort());
+                    console.log('ApplyCrop exists:', !!window.go.main.App.ApplyCrop);
+                } else {
+                    console.log('Go runtime not ready yet');
+                }
+            }, 1000);
+        });
+        
+        // Crop helper functions - these will be overridden by app.js once it loads
+        console.log('=== CROP HELPER SCRIPT STARTING ===');
+        
+        window.toggleCropMode = function() {
+            console.log('toggleCropMode called (helper)');
+            if (typeof toggleCropModeImpl === 'function') {
+                toggleCropModeImpl();
+            } else {
+                console.error('toggleCropModeImpl not yet available');
+                alert('App is still loading. Please wait a moment and try again.');
+            }
+        };
+        
+        window.applyCrop = function() {
+            console.log('applyCrop called (helper)');
+            if (typeof applyCropImpl === 'function') {
+                applyCropImpl();
+            } else {
+                console.error('applyCropImpl not yet available');
+                alert('App is still loading. Please wait a moment and try again.');
+            }
+        };
+        
+        window.cancelCrop = function() {
+            console.log('cancelCrop called (helper)');
+            if (typeof cancelCropImpl === 'function') {
+                cancelCropImpl();
+            } else {
+                console.error('cancelCropImpl not yet available');
+            }
+        };
+        
+        console.log('Crop helper functions defined');
+    </script>
     <script src="app.js"></script>
 </body>
 </html>

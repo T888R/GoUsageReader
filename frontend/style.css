@@ -444,9 +444,9 @@ body.shift-held #pageBackground {
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 550;
+    z-index: 100;
     pointer-events: none;
-    background: rgba(0, 0, 0, 0.1);
+    background: transparent;
 }
 
 #cropOverlay.active {
@@ -460,6 +460,7 @@ body.shift-held #pageBackground {
     background: rgba(156, 39, 176, 0.2);
     pointer-events: none;
     display: none;
+    z-index: 200;
 }
 
 #cropSelection.active {
