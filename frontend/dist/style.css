@@ -5,6 +5,10 @@
     padding: 0;
 }
 
+html {
+    background-color: #001a33;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -196,6 +200,7 @@ button {
     width: 100vw;
     height: 100vh;
     z-index: -1;
+    background-color: #001a33;
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;

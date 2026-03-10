@@ -2206,4 +2206,10 @@ console.log('Checking if crop functions are defined:');
 console.log('  toggleCropModeImpl:', typeof toggleCropModeImpl);
 console.log('  applyCropImpl:', typeof applyCropImpl);
 console.log('  cancelCropImpl:', typeof cancelCropImpl);
+
+// Set initial background color on startup
+if (pageBackground) {
+    pageBackground.style.backgroundColor = '#001a33';
+}
+
 console.log('Usage Reader with perspective transform and crop tool initialized');
