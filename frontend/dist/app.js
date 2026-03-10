@@ -2068,34 +2068,11 @@ async function applyCropImpl() {
             return;
         }
         
-        console.log('Converting image data...');
-        // Convert base64 data URL to byte array properly
+        console.log('Preparing image data...');
+        // Get the base64 data (without the data URL prefix)
         const base64Data = appState.originalImageBlob.split(',')[1];
         console.log('Base64 data length:', base64Data.length);
         console.log('First 50 chars of base64:', base64Data.substring(0, 50));
-        
-        // Decode base64 to binary
-        const binaryString = atob(base64Data);
-        console.log('Binary string length:', binaryString.length);
-        
-        // Check first few bytes to identify format
-        const firstBytes = [];
-        for (let i = 0; i < Math.min(10, binaryString.length); i++) {
-            firstBytes.push(binaryString.charCodeAt(i));
-        }
-        console.log('First 10 bytes:', firstBytes);
-        
-        // Check for PNG signature (137 80 78 71 13 10 26 10)
-        const isPNG = firstBytes[0] === 137 && firstBytes[1] === 80 && firstBytes[2] === 78 && firstBytes[3] === 71;
-        const isJPEG = firstBytes[0] === 255 && firstBytes[1] === 216;
-        console.log('Is PNG:', isPNG, 'Is JPEG:', isJPEG);
-        
-        // Create array directly from binary string
-        const imageData = [];
-        for (let i = 0; i < binaryString.length; i++) {
-            imageData.push(binaryString.charCodeAt(i) & 0xFF);
-        }
-        console.log('Image data converted, size:', imageData.length);
         
         console.log('Calling backend ApplyCrop with params:');
         console.log('  x:', Math.round(topLeft.x));
@@ -2103,9 +2080,10 @@ async function applyCropImpl() {
         console.log('  width:', Math.round(bottomRight.x - topLeft.x));
         console.log('  height:', Math.round(bottomRight.y - topLeft.y));
         
-        // Send to backend for actual cropping
+        // Send to backend for actual cropping - pass base64 string directly
+        // Wails v2 will handle the []byte conversion from base64
         const croppedData = await callGo("ApplyCrop",
-            imageData,
+            base64Data,  // Pass base64 string, not array
             Math.round(topLeft.x),
             Math.round(topLeft.y),
             Math.round(bottomRight.x - topLeft.x),
@@ -2113,40 +2091,43 @@ async function applyCropImpl() {
         );
         
         console.log('Backend returned cropped data:', croppedData ? 'YES' : 'NO');
+        console.log('Cropped data type:', typeof croppedData);
         console.log('Cropped data length:', croppedData ? croppedData.length : 0);
+        console.log('CODE VERSION: 2.0');
         
         if (croppedData && croppedData.length > 0) {
             console.log('Processing cropped image...');
-            // Check first bytes to identify format
-            let firstBytes = [];
-            for (let i = 0; i < Math.min(10, croppedData.length); i++) {
-                firstBytes.push(croppedData[i]);
-            }
-            console.log('First 10 bytes of cropped data:', firstBytes);
-            const isPNG = firstBytes[0] === 137 && firstBytes[1] === 80 && firstBytes[2] === 78 && firstBytes[3] === 71;
-            console.log('Is PNG format:', isPNG);
             
-            // Convert cropped data back to base64
-            // Handle both array formats from Go
-            let croppedArray;
-            if (Array.isArray(croppedData)) {
-                croppedArray = croppedData;
-            } else if (croppedData instanceof Uint8Array || croppedData instanceof ArrayBuffer) {
-                croppedArray = Array.from(croppedData);
+            // Wails returns []byte as array of characters
+            let croppedUrl;
+            let base64String = '';
+            
+            if (typeof croppedData === 'string') {
+                console.log('Received string from Wails');
+                base64String = croppedData;
             } else {
-                // Try to convert to array
-                croppedArray = Array.prototype.slice.call(croppedData);
+                // It's an array of characters from Wails
+                console.log('Received array from Wails, joining...');
+                
+                // Fast join using array method
+                if (Array.isArray(croppedData)) {
+                    base64String = croppedData.join('');
+                } else {
+                    // Convert to array first
+                    const arr = [];
+                    for (let i = 0; i < croppedData.length; i++) {
+                        arr.push(croppedData[i]);
+                    }
+                    base64String = arr.join('');
+                }
             }
-            console.log('Cropped array type:', typeof croppedArray, 'length:', croppedArray.length);
             
-            // Convert byte array to binary string safely
-            let binaryString = '';
-            for (let i = 0; i < croppedArray.length; i++) {
-                binaryString += String.fromCharCode(croppedArray[i] & 0xFF);
-            }
+            console.log('Base64 string length:', base64String.length);
+            console.log('Base64 starts with:', base64String.substring(0, 50));
+            console.log('Base64 ends with:', base64String.substring(base64String.length - 20));
             
-            const base64String = btoa(binaryString);
-            const croppedUrl = `data:image/png;base64,${base64String}`;
+            // Build data URL
+            croppedUrl = `data:image/png;base64,${base64String}`;
             console.log('Cropped URL created, length:', croppedUrl.length);
             console.log('Setting background image...');
             

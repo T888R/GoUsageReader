@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/base64"
 	"fmt"
 	"image"
 	"image/color"
@@ -891,12 +892,26 @@ func solveLinearSystem(A [][]float64, b []float64) []float64 {
 
 // ApplyCrop crops an image to the specified rectangle
 // x, y are the top-left coordinates, width and height are the dimensions
-func (a *App) ApplyCrop(imageData []byte, x, y, width, height int) ([]byte, error) {
+// imageData is a base64 encoded string
+func (a *App) ApplyCrop(imageDataBase64 string, x, y, width, height int) ([]byte, error) {
 	// Log received data info
-	fmt.Printf("ApplyCrop received: %d bytes, crop region: (%d,%d,%d,%d)\n", len(imageData), x, y, width, height)
+	fmt.Printf("ApplyCrop received base64 string length: %d, crop region: (%d,%d,%d,%d)\n", len(imageDataBase64), x, y, width, height)
+
+	if len(imageDataBase64) < 10 {
+		return nil, fmt.Errorf("image data too small: %d bytes", len(imageDataBase64))
+	}
+
+	// Decode base64 string to bytes
+	imageData, err := base64.StdEncoding.DecodeString(imageDataBase64)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to decode base64: %v\n", err)
+		return nil, fmt.Errorf("failed to decode base64 image data: %w", err)
+	}
+
+	fmt.Printf("Decoded image data size: %d bytes\n", len(imageData))
 
 	if len(imageData) < 10 {
-		return nil, fmt.Errorf("image data too small: %d bytes", len(imageData))
+		return nil, fmt.Errorf("decoded image data too small: %d bytes", len(imageData))
 	}
 
 	// Log first bytes to check format
@@ -910,6 +925,7 @@ func (a *App) ApplyCrop(imageData []byte, x, y, width, height int) ([]byte, erro
 	// Decode the source image
 	srcImg, format, err := image.Decode(bytes.NewReader(imageData))
 	if err != nil {
+		fmt.Printf("ERROR: Failed to decode image: %v\n", err)
 		return nil, fmt.Errorf("failed to decode image: %w", err)
 	}
 	fmt.Printf("Successfully decoded %s image\n", format)
@@ -917,25 +933,36 @@ func (a *App) ApplyCrop(imageData []byte, x, y, width, height int) ([]byte, erro
 	srcBounds := srcImg.Bounds()
 	srcWidth := srcBounds.Dx()
 	srcHeight := srcBounds.Dy()
+	fmt.Printf("Source image bounds: %v, size: %dx%d\n", srcBounds, srcWidth, srcHeight)
+	fmt.Printf("Requested crop: x=%d, y=%d, width=%d, height=%d\n", x, y, width, height)
 
 	// Validate crop bounds
 	if x < 0 {
+		fmt.Printf("Adjusting x from %d to 0\n", x)
 		x = 0
 	}
 	if y < 0 {
+		fmt.Printf("Adjusting y from %d to 0\n", y)
 		y = 0
 	}
 	if x+width > srcWidth {
+		oldWidth := width
 		width = srcWidth - x
+		fmt.Printf("Adjusting width from %d to %d (x=%d, srcWidth=%d)\n", oldWidth, width, x, srcWidth)
 	}
 	if y+height > srcHeight {
+		oldHeight := height
 		height = srcHeight - y
+		fmt.Printf("Adjusting height from %d to %d (y=%d, srcHeight=%d)\n", oldHeight, height, y, srcHeight)
 	}
 
 	// Ensure valid dimensions
 	if width <= 0 || height <= 0 {
-		return nil, fmt.Errorf("invalid crop dimensions")
+		fmt.Printf("ERROR: Invalid crop dimensions after adjustment: width=%d, height=%d\n", width, height)
+		return nil, fmt.Errorf("invalid crop dimensions: width=%d, height=%d", width, height)
 	}
+
+	fmt.Printf("Final crop dimensions: %dx%d at (%d,%d)\n", width, height, x, y)
 
 	// Create destination image
 	dstImg := image.NewRGBA(image.Rect(0, 0, width, height))
@@ -953,10 +980,13 @@ func (a *App) ApplyCrop(imageData []byte, x, y, width, height int) ([]byte, erro
 	// Encode result as PNG
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, dstImg); err != nil {
+		fmt.Printf("ERROR: Failed to encode PNG: %v\n", err)
 		return nil, fmt.Errorf("failed to encode cropped image: %w", err)
 	}
 
-	return buf.Bytes(), nil
+	result := buf.Bytes()
+	fmt.Printf("Successfully encoded PNG, result size: %d bytes\n", len(result))
+	return result, nil
 }
 
 func main() {
