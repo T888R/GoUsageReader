@@ -35,6 +35,8 @@ export function IsPerspectiveMode():Promise<boolean>;
 
 export function IsRegularMode():Promise<boolean>;
 
+export function OpenImageDialog():Promise<string>;
+
 export function Reset():Promise<void>;
 
 export function ResetPerspective():Promise<void>;

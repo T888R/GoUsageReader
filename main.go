@@ -11,7 +11,10 @@ import (
 	_ "image/jpeg" // Register JPEG decoder
 	"image/png"
 	"math"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/wailsapp/wails/v2"
@@ -84,6 +87,58 @@ func (a *App) OnStartup(ctx context.Context) {
 
 // OnShutdown is called when the app shuts down
 func (a *App) OnShutdown(ctx context.Context) {
+}
+
+// OpenImageDialog opens a native file dialog for selecting an image file
+// Returns the file path and base64 encoded image data
+func (a *App) OpenImageDialog() (string, string, error) {
+	selection, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Select Image File",
+		Filters: []wailsruntime.FileFilter{
+			{
+				DisplayName: "Image Files (*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp)",
+				Pattern:     "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp",
+			},
+			{
+				DisplayName: "All Files (*.*)",
+				Pattern:     "*.*",
+			},
+		},
+		ShowHiddenFiles:            false,
+		CanCreateDirectories:       false,
+		TreatPackagesAsDirectories: false,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to open file dialog: %w", err)
+	}
+	if selection == "" {
+		return "", "", nil // User cancelled
+	}
+
+	// Read the file
+	imageData, err := os.ReadFile(selection)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Encode to base64
+	base64Data := base64.StdEncoding.EncodeToString(imageData)
+	dataURL := fmt.Sprintf("data:image/png;base64,%s", base64Data)
+
+	// Try to detect image type from file extension
+	ext := strings.ToLower(filepath.Ext(selection))
+	switch ext {
+	case ".jpg", ".jpeg":
+		dataURL = fmt.Sprintf("data:image/jpeg;base64,%s", base64Data)
+	case ".gif":
+		dataURL = fmt.Sprintf("data:image/gif;base64,%s", base64Data)
+	case ".bmp":
+		dataURL = fmt.Sprintf("data:image/bmp;base64,%s", base64Data)
+	case ".webp":
+		dataURL = fmt.Sprintf("data:image/webp;base64,%s", base64Data)
+	}
+
+	return selection, dataURL, nil
 }
 
 // SetWindowHeight sets the window height and calculates maxYRes from it
@@ -273,6 +328,8 @@ func (a *App) HandleClick(yPos int) (string, string, error) {
 	case 13:
 		a.december = a.calcGraph(yAxisLocation)
 		reading = "December: " + a.december
+		// Disable regular usage mode to prevent overriding values
+		a.regularUsage = false
 		// Auto-paste on completion
 		go a.autoPaste()
 	default:
@@ -387,6 +444,8 @@ func (a *App) HandleAddonClick(yPos int) (string, string, error) {
 		a.decB = a.calcAddonGraph(yAxisLocation)
 		a.december = a.calcNet(a.decA, a.decB)
 		reading = "December: " + a.december
+		// Disable addon usage mode to prevent overriding values
+		a.addonUsage = false
 		go a.autoPaste()
 	default:
 		reading = "Completed"

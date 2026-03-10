@@ -70,6 +70,10 @@ export function IsRegularMode() {
   return window['go']['main']['App']['IsRegularMode']();
 }
 
+export function OpenImageDialog() {
+  return window['go']['main']['App']['OpenImageDialog']();
+}
+
 export function Reset() {
   return window['go']['main']['App']['Reset']();
 }

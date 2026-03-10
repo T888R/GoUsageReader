@@ -171,6 +171,8 @@ window.go.main.App = {
             case 13:
                 appData.december = calcGraph(yAxisLocation);
                 reading = "December: " + appData.december;
+                // Disable regular usage mode to prevent overriding values
+                appData.regularUsage = false;
                 break;
             default:
                 reading = "Completed";
@@ -303,6 +305,8 @@ window.go.main.App = {
                 appData.decB = calcGraph(yAxisLocation);
                 appData.december = calcNet(appData.decA, appData.decB);
                 reading = "December: " + appData.december;
+                // Disable addon usage mode to prevent overriding values
+                appData.addonUsage = false;
                 break;
             default:
                 reading = "Completed";

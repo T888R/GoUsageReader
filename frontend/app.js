@@ -95,8 +95,72 @@ async function callGo(methodName, ...args) {
     }
 }
 
-// Image import
-importBtn.addEventListener('click', () => fileInput.click());
+// Helper function to extract reading from Wails result
+// Handles both array format [reading, desc, error] and object format {r0: reading, r1: desc, r2: error}
+function extractReading(result) {
+    if (!result) return '';
+    
+    // Check if it's an array (from mock runtime.js)
+    if (Array.isArray(result)) {
+        return result[0] || '';
+    }
+    
+    // Check if it's an object with numbered properties (Wails v2 format)
+    if (typeof result === 'object') {
+        // Wails v2 returns multiple values as r0, r1, r2, etc.
+        if (result.r0 !== undefined) {
+            return result.r0;
+        }
+        // Fallback: try to find any string property
+        for (const key in result) {
+            if (typeof result[key] === 'string' && result[key].length > 0) {
+                return result[key];
+            }
+        }
+    }
+    
+    // If it's a string, return it directly
+    if (typeof result === 'string') {
+        return result;
+    }
+    
+    return '';
+}
+
+// Image import - uses native file dialog
+importBtn.addEventListener('click', async () => {
+    try {
+        const result = await callGo('OpenImageDialog');
+        if (!result) return; // User cancelled or error
+        
+        // Wails returns multiple values as r0, r1, r2
+        const filePath = result.r0 || result[0];
+        const imageData = result.r1 || result[1];
+        const error = result.r2 || result[2];
+        
+        if (error) {
+            console.error('File dialog error:', error);
+            return;
+        }
+        
+        if (!filePath || !imageData) {
+            return; // User cancelled
+        }
+        
+        // Extract filename from path
+        const filename = filePath.split('/').pop() || filePath.split('\\').pop() || 'image';
+        
+        // Show preview
+        pendingImageData = imageData;
+        pendingImageFile = { name: filename };
+        showImagePreview(imageData, filename);
+        
+    } catch (err) {
+        console.error('Error opening file dialog:', err);
+        // Fallback to HTML file input
+        fileInput.click();
+    }
+});
 
 // Grid toggle
 gridToggle.addEventListener('click', () => {
@@ -108,31 +172,85 @@ gridToggle.addEventListener('click', () => {
     gridToggle.classList.toggle('active', appState.gridEnabled);
 });
 
+// Image import with preview
+let pendingImageData = null;
+let pendingImageFile = null;
+
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = (event) => {
-            pageBackground.style.backgroundImage = `url(${event.target.result})`;
-            document.body.style.background = 'none';
+            // Store the image data temporarily
+            pendingImageData = event.target.result;
+            pendingImageFile = file;
             
-            // Store original image data for perspective transform
-            appState.originalImageData = pageBackground.style.backgroundImage;
-            appState.originalImageBlob = event.target.result;
-            
-            // Get and store raw image dimensions
-            const img = new Image();
-            img.onload = () => {
-                appState.rawImageWidth = img.naturalWidth;
-                appState.rawImageHeight = img.naturalHeight;
-                console.log('Raw image dimensions:', appState.rawImageWidth, 'x', appState.rawImageHeight);
-            };
-            img.src = event.target.result;
-            
-            resetView();
-            showNotification('Image imported successfully. You can now use perspective transform.');
+            // Show preview dialog
+            showImagePreview(pendingImageData, file.name);
         };
         reader.readAsDataURL(file);
+    }
+});
+
+// Show image preview dialog
+function showImagePreview(imageData, filename) {
+    const previewDialog = document.getElementById('imagePreviewDialog');
+    const previewImage = document.getElementById('previewImage');
+    const previewFilename = document.getElementById('previewFilename');
+    
+    previewImage.src = imageData;
+    previewFilename.textContent = filename;
+    previewDialog.classList.remove('hidden');
+}
+
+// Hide image preview dialog
+function hideImagePreview() {
+    const previewDialog = document.getElementById('imagePreviewDialog');
+    previewDialog.classList.add('hidden');
+    previewDialog.querySelector('#previewImage').src = '';
+    pendingImageData = null;
+    pendingImageFile = null;
+}
+
+// Confirm import
+function confirmImageImport() {
+    if (!pendingImageData) return;
+    
+    pageBackground.style.backgroundImage = `url(${pendingImageData})`;
+    document.body.style.background = 'none';
+    
+    // Store original image data for perspective transform
+    appState.originalImageData = pageBackground.style.backgroundImage;
+    appState.originalImageBlob = pendingImageData;
+    
+    // Get and store raw image dimensions
+    const img = new Image();
+    img.onload = () => {
+        appState.rawImageWidth = img.naturalWidth;
+        appState.rawImageHeight = img.naturalHeight;
+        console.log('Raw image dimensions:', appState.rawImageWidth, 'x', appState.rawImageHeight);
+    };
+    img.src = pendingImageData;
+    
+    hideImagePreview();
+    resetView();
+    showNotification('Image imported successfully. You can now use perspective transform.');
+}
+
+// Setup preview dialog buttons
+document.addEventListener('DOMContentLoaded', () => {
+    const confirmBtn = document.getElementById('confirmImportBtn');
+    const cancelBtn = document.getElementById('cancelImportBtn');
+    
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', confirmImageImport);
+    }
+    
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            hideImagePreview();
+            fileInput.value = ''; // Reset file input
+        });
     }
 });
 
@@ -273,17 +391,42 @@ async function handleCaptureClick(e) {
     // Send to backend
     try {
         let result;
+        let reading = '';
         if (appState.mode === 'standard') {
             result = await callGo("HandleClick", yPos);
+            console.log('HandleClick result:', result);
+            // Wails returns multiple values as an object with properties
+            reading = extractReading(result);
             await updateDescription();
         } else {
             result = await callGo("HandleAddonClick", yPos);
+            console.log('HandleAddonClick result:', result);
+            reading = extractReading(result);
             await updateAddonDescription();
         }
         
-        if (result && result[0]) {
-            readingsOutput.textContent += result[0] + '\n';
+        // Display the reading
+        if (reading) {
+            readingsOutput.textContent += reading + '\n';
             readingsOutput.scrollTop = readingsOutput.scrollHeight;
+            console.log('Reading captured:', reading);
+        }
+        
+        // Check if mode was disabled after this click (e.g., after December)
+        // and update frontend state accordingly
+        let isModeActive = false;
+        if (appState.mode === 'standard') {
+            isModeActive = await callGo("IsRegularMode");
+        } else {
+            isModeActive = await callGo("IsAddonMode");
+        }
+        
+        if (!isModeActive) {
+            // Mode was disabled (e.g., after December click), reset frontend state
+            appState.mode = null;
+            standardBtn.classList.remove('mode-active');
+            addonBtn.classList.remove('mode-active');
+            showNotification('All months captured! Paste values to spreadsheet.');
         }
     } catch (err) {
         console.error('Error handling click:', err);
