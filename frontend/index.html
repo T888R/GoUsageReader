@@ -44,6 +44,22 @@
       <div id="cropSelection"></div>
     </div>
 
+    <!-- Crop Preview Modal - Shown on image import -->
+    <div id="cropPreviewModal" style="display: none">
+      <div class="crop-preview-content">
+        <h2>Crop Image</h2>
+        <p>Drag to select the area you want to keep, or skip to use the full image.</p>
+        <div class="crop-preview-container">
+          <img id="cropPreviewImage" src="" alt="Preview" />
+          <div id="cropPreviewSelection"></div>
+        </div>
+        <div class="crop-preview-buttons">
+          <button id="cropPreviewApply" class="btn-primary">Apply Crop</button>
+          <button id="cropPreviewSkip" class="btn-secondary">Skip Crop</button>
+        </div>
+      </div>
+    </div>
+
     <div class="container">
       <h1>Usage Reader</h1>
 
@@ -90,12 +106,6 @@
         <button id="resetPerspective" style="display: none">
           Reset Corners
         </button>
-      </div>
-
-      <div class="crop-controls-ui">
-        <button id="cropToggle">Crop: Off</button>
-        <button id="applyCrop" style="display: none">Apply Crop</button>
-        <button id="cancelCrop" style="display: none">Cancel</button>
       </div>
 
       <div class="status">

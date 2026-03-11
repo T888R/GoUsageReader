@@ -491,3 +491,120 @@ body.shift-held #pageBackground {
 body.crop-mode {
     cursor: crosshair;
 }
+
+/* Crop Preview Modal */
+#cropPreviewModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.crop-preview-content {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.crop-preview-content h2 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+.crop-preview-content p {
+    margin: 0 0 20px 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.crop-preview-container {
+    position: relative;
+    flex: 1;
+    min-height: 300px;
+    max-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: crosshair;
+}
+
+#cropPreviewImage {
+    max-width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+#cropPreviewSelection {
+    position: absolute;
+    border: 2px dashed #9c27b0;
+    background: rgba(156, 39, 176, 0.2);
+    pointer-events: none;
+    display: none;
+}
+
+#cropPreviewSelection.active {
+    display: block;
+}
+
+.crop-preview-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    justify-content: center;
+}
+
+.crop-preview-buttons button {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#cropPreviewApply {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+#cropPreviewApply:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+#cropPreviewApply:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+#cropPreviewSkip {
+    background: #f5f5f5;
+    color: #666;
+    border: 2px solid #ddd;
+}
+
+#cropPreviewSkip:hover {
+    background: #e0e0e0;
+    transform: translateY(-2px);
+}

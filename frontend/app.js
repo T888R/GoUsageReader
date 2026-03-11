@@ -1,5 +1,13 @@
 console.log('APP.JS STARTING TO LOAD - Line 1');
 
+// Check if Go runtime is available
+console.log('window.go available:', !!window.go);
+console.log('window.go.main available:', !!(window.go && window.go.main));
+console.log('window.go.main.App available:', !!(window.go && window.go.main && window.go.main.App));
+if (window.go && window.go.main && window.go.main.App) {
+    console.log('Go methods available:', Object.keys(window.go.main.App));
+}
+
 // Application state - use window.appState to make it global
 if (!window.appState) {
     window.appState = {};
@@ -79,6 +87,8 @@ async function callGo(methodName, ...args) {
     // Always check window.go directly in case it loaded after script initialization
     if (!window.go || !window.go.main || !window.go.main.App) {
         console.warn(`Go runtime not available for ${methodName}`);
+        console.log('window.go:', window.go);
+        console.log('window.go?.main:', window.go?.main);
         return null;
     }
     
@@ -88,7 +98,10 @@ async function callGo(methodName, ...args) {
     }
     
     try {
-        return await window.go.main.App[methodName](...args);
+        console.log(`Calling ${methodName} with args:`, args);
+        const result = await window.go.main.App[methodName](...args);
+        console.log(`${methodName} raw result:`, result);
+        return result;
     } catch (err) {
         console.error(`Error calling ${methodName}:`, err);
         throw err;
@@ -96,34 +109,50 @@ async function callGo(methodName, ...args) {
 }
 
 // Helper function to extract reading from Wails result
-// Handles both array format [reading, desc, error] and object format {r0: reading, r1: desc, r2: error}
+// Handles struct format {reading: string, description: string} from Go
 function extractReading(result) {
-    if (!result) return '';
-    
+    console.log('extractReading called with:', result, 'type:', typeof result);
+
+    if (!result) {
+        console.log('extractReading: result is null/undefined, returning empty string');
+        return '';
+    }
+
+    // Check if it's the new struct format from Go
+    if (typeof result === 'object' && result.reading !== undefined) {
+        console.log('extractReading: found struct format, reading:', result.reading);
+        return result.reading;
+    }
+
     // Check if it's an array (from mock runtime.js)
     if (Array.isArray(result)) {
+        console.log('extractReading: result is array, returning:', result[0]);
         return result[0] || '';
     }
-    
-    // Check if it's an object with numbered properties (Wails v2 format)
+
+    // Check if it's an object with numbered properties (old Wails v2 format)
     if (typeof result === 'object') {
-        // Wails v2 returns multiple values as r0, r1, r2, etc.
+        console.log('extractReading: result is object, keys:', Object.keys(result));
         if (result.r0 !== undefined) {
+            console.log('extractReading: found r0:', result.r0);
             return result.r0;
         }
         // Fallback: try to find any string property
         for (const key in result) {
             if (typeof result[key] === 'string' && result[key].length > 0) {
+                console.log('extractReading: found string property', key, ':', result[key]);
                 return result[key];
             }
         }
     }
-    
+
     // If it's a string, return it directly
     if (typeof result === 'string') {
+        console.log('extractReading: result is string:', result);
         return result;
     }
-    
+
+    console.log('extractReading: no match found, returning empty string');
     return '';
 }
 
@@ -153,24 +182,8 @@ fileInput.addEventListener('change', (e) => {
     if (file) {
         const reader = new FileReader();
         reader.onload = (event) => {
-            pageBackground.style.backgroundImage = `url(${event.target.result})`;
-            document.body.style.background = 'none';
-            
-            // Store original image data for perspective transform
-            appState.originalImageData = pageBackground.style.backgroundImage;
-            appState.originalImageBlob = event.target.result;
-            
-            // Get and store raw image dimensions
-            const img = new Image();
-            img.onload = () => {
-                appState.rawImageWidth = img.naturalWidth;
-                appState.rawImageHeight = img.naturalHeight;
-                console.log('Raw image dimensions:', appState.rawImageWidth, 'x', appState.rawImageHeight);
-            };
-            img.src = event.target.result;
-            
-            resetView();
-            showNotification('Image imported successfully. You can now use perspective transform.');
+            // Show crop preview modal instead of immediately loading the image
+            showCropPreviewModal(event.target.result);
         };
         reader.readAsDataURL(file);
     }
@@ -320,8 +333,10 @@ async function handleCaptureClick(e) {
         let reading = '';
         if (appState.mode === 'standard') {
             console.log('Calling HandleClick with yPos:', yPos);
+            console.log('window.go.main.App exists:', !!(window.go && window.go.main && window.go.main.App));
+            console.log('window.go.main.App.HandleClick exists:', !!(window.go && window.go.main && window.go.main.App && window.go.main.App.HandleClick));
             result = await callGo("HandleClick", yPos);
-            console.log('HandleClick result type:', typeof result, 'value:', result);
+            console.log('HandleClick result type:', typeof result, 'value:', result, 'JSON:', JSON.stringify(result));
             // Wails returns multiple values as an object with properties
             reading = extractReading(result);
             console.log('Extracted reading:', reading);
@@ -499,7 +514,7 @@ function showNotification(message) {
     notif.style.cssText = `
         position: fixed;
         top: 20px;
-        right: 20px;
+        left: 20px;
         background: #4caf50;
         color: white;
         padding: 15px 20px;
@@ -2268,6 +2283,311 @@ async function applyCropImpl() {
         showNotification('Error applying crop: ' + error.message);
     }
 }
+
+// ============================================
+// CROP PREVIEW MODAL FUNCTIONS
+// ============================================
+
+// Crop preview modal state
+let cropPreviewModal, cropPreviewImage, cropPreviewSelection, cropPreviewApplyBtn, cropPreviewSkipBtn;
+let cropPreviewSelectionData = null;
+let isDrawingCropPreview = false;
+let cropPreviewStart = null;
+
+// Initialize crop preview elements
+function initCropPreviewElements() {
+    cropPreviewModal = document.getElementById('cropPreviewModal');
+    cropPreviewImage = document.getElementById('cropPreviewImage');
+    cropPreviewSelection = document.getElementById('cropPreviewSelection');
+    cropPreviewApplyBtn = document.getElementById('cropPreviewApply');
+    cropPreviewSkipBtn = document.getElementById('cropPreviewSkip');
+    
+    if (cropPreviewApplyBtn) {
+        cropPreviewApplyBtn.addEventListener('click', applyCropFromPreview);
+    }
+    
+    if (cropPreviewSkipBtn) {
+        cropPreviewSkipBtn.addEventListener('click', skipCropPreview);
+    }
+}
+
+// Show crop preview modal
+function showCropPreviewModal(imageDataUrl) {
+    if (!cropPreviewModal) {
+        initCropPreviewElements();
+    }
+    
+    // Set the preview image
+    cropPreviewImage.src = imageDataUrl;
+    
+    // Reset selection
+    cropPreviewSelectionData = null;
+    cropPreviewSelection.style.display = 'none';
+    cropPreviewSelection.classList.remove('active');
+    
+    // Disable apply button until selection is made
+    cropPreviewApplyBtn.disabled = true;
+    cropPreviewApplyBtn.textContent = 'Apply Crop';
+    
+    // Show modal
+    cropPreviewModal.style.display = 'flex';
+    
+    // Add event listeners for drawing selection
+    const container = document.querySelector('.crop-preview-container');
+    container.addEventListener('mousedown', startCropPreviewDrawing);
+}
+
+// Start drawing crop selection in preview
+function startCropPreviewDrawing(e) {
+    if (e.target !== cropPreviewImage && e.target !== document.querySelector('.crop-preview-container')) {
+        return;
+    }
+    
+    e.preventDefault();
+    
+    const container = document.querySelector('.crop-preview-container');
+    const rect = container.getBoundingClientRect();
+    
+    // Clear existing selection
+    clearCropPreviewSelection();
+    
+    isDrawingCropPreview = true;
+    cropPreviewStart = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
+    
+    // Show selection element
+    cropPreviewSelection.style.display = 'block';
+    cropPreviewSelection.classList.add('active');
+    cropPreviewSelection.style.left = cropPreviewStart.x + 'px';
+    cropPreviewSelection.style.top = cropPreviewStart.y + 'px';
+    cropPreviewSelection.style.width = '0px';
+    cropPreviewSelection.style.height = '0px';
+    
+    document.addEventListener('mousemove', updateCropPreviewDrawing);
+    document.addEventListener('mouseup', endCropPreviewDrawing);
+}
+
+// Update crop selection while dragging
+function updateCropPreviewDrawing(e) {
+    if (!isDrawingCropPreview) return;
+    
+    const container = document.querySelector('.crop-preview-container');
+    const rect = container.getBoundingClientRect();
+    
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    
+    const left = Math.min(cropPreviewStart.x, currentX);
+    const top = Math.min(cropPreviewStart.y, currentY);
+    const width = Math.abs(currentX - cropPreviewStart.x);
+    const height = Math.abs(currentY - cropPreviewStart.y);
+    
+    cropPreviewSelection.style.left = left + 'px';
+    cropPreviewSelection.style.top = top + 'px';
+    cropPreviewSelection.style.width = width + 'px';
+    cropPreviewSelection.style.height = height + 'px';
+}
+
+// End drawing crop selection
+function endCropPreviewDrawing(e) {
+    if (!isDrawingCropPreview) return;
+    
+    isDrawingCropPreview = false;
+    
+    const container = document.querySelector('.crop-preview-container');
+    const rect = container.getBoundingClientRect();
+    
+    const endX = e.clientX - rect.left;
+    const endY = e.clientY - rect.top;
+    
+    const left = Math.min(cropPreviewStart.x, endX);
+    const top = Math.min(cropPreviewStart.y, endY);
+    const width = Math.abs(endX - cropPreviewStart.x);
+    const height = Math.abs(endY - cropPreviewStart.y);
+    
+    document.removeEventListener('mousemove', updateCropPreviewDrawing);
+    document.removeEventListener('mouseup', endCropPreviewDrawing);
+    
+    // Only keep selection if it has meaningful size
+    if (width >= 10 && height >= 10) {
+        cropPreviewSelectionData = { x: left, y: top, width, height };
+        cropPreviewApplyBtn.disabled = false;
+        cropPreviewApplyBtn.textContent = 'Apply Crop';
+    } else {
+        clearCropPreviewSelection();
+    }
+}
+
+// Clear crop preview selection
+function clearCropPreviewSelection() {
+    cropPreviewSelectionData = null;
+    cropPreviewSelection.style.display = 'none';
+    cropPreviewSelection.classList.remove('active');
+    cropPreviewApplyBtn.disabled = true;
+}
+
+// Apply crop from preview modal
+async function applyCropFromPreview() {
+    if (!cropPreviewSelectionData || !cropPreviewImage.src) return;
+    
+    cropPreviewApplyBtn.disabled = true;
+    cropPreviewApplyBtn.textContent = 'Processing...';
+    
+    try {
+        // Get image natural dimensions
+        const img = new Image();
+        img.src = cropPreviewImage.src;
+        await new Promise(resolve => {
+            img.onload = resolve;
+        });
+        
+        const naturalWidth = img.naturalWidth;
+        const naturalHeight = img.naturalHeight;
+        
+        // Get displayed dimensions
+        const displayedWidth = cropPreviewImage.clientWidth;
+        const displayedHeight = cropPreviewImage.clientHeight;
+        
+        // Get image position within container
+        const container = document.querySelector('.crop-preview-container');
+        const containerRect = container.getBoundingClientRect();
+        const imageRect = cropPreviewImage.getBoundingClientRect();
+        
+        const imageOffsetX = imageRect.left - containerRect.left;
+        const imageOffsetY = imageRect.top - containerRect.top;
+        
+        // Convert selection from container coordinates to image coordinates
+        const selectionRelativeX = cropPreviewSelectionData.x - imageOffsetX;
+        const selectionRelativeY = cropPreviewSelectionData.y - imageOffsetY;
+        
+        // Scale to natural dimensions
+        const scaleX = naturalWidth / displayedWidth;
+        const scaleY = naturalHeight / displayedHeight;
+        
+        const cropX = Math.round(selectionRelativeX * scaleX);
+        const cropY = Math.round(selectionRelativeY * scaleY);
+        const cropWidth = Math.round(cropPreviewSelectionData.width * scaleX);
+        const cropHeight = Math.round(cropPreviewSelectionData.height * scaleY);
+        
+        // Ensure valid crop dimensions
+        const finalX = Math.max(0, cropX);
+        const finalY = Math.max(0, cropY);
+        const finalWidth = Math.min(cropWidth, naturalWidth - finalX);
+        const finalHeight = Math.min(cropHeight, naturalHeight - finalY);
+        
+        if (finalWidth <= 0 || finalHeight <= 0) {
+            showNotification('Invalid crop selection');
+            cropPreviewApplyBtn.disabled = false;
+            cropPreviewApplyBtn.textContent = 'Apply Crop';
+            return;
+        }
+        
+        // Apply crop using backend
+        const base64Data = cropPreviewImage.src.split(',')[1];
+        const croppedData = await callGo("ApplyCrop", base64Data, finalX, finalY, finalWidth, finalHeight);
+        
+        if (croppedData && croppedData.length > 0) {
+            // Process cropped data
+            let base64String = '';
+            if (typeof croppedData === 'string') {
+                base64String = croppedData;
+            } else if (Array.isArray(croppedData)) {
+                base64String = croppedData.join('');
+            } else {
+                const arr = [];
+                for (let i = 0; i < croppedData.length; i++) {
+                    arr.push(croppedData[i]);
+                }
+                base64String = arr.join('');
+            }
+            
+            const croppedUrl = `data:image/png;base64,${base64String}`;
+            
+            // Load the cropped image to get dimensions
+            const croppedImg = new Image();
+            croppedImg.onload = () => {
+                // Set the image
+                pageBackground.style.backgroundImage = `url(${croppedUrl})`;
+                document.body.style.background = 'none';
+                
+                // Store original image data
+                appState.originalImageBlob = croppedUrl;
+                appState.originalImageData = pageBackground.style.backgroundImage;
+                
+                // Update dimensions
+                appState.rawImageWidth = croppedImg.naturalWidth;
+                appState.rawImageHeight = croppedImg.naturalHeight;
+                
+                // Reset view
+                resetView();
+                
+                // Close modal
+                hideCropPreviewModal();
+                
+                showNotification('Image cropped successfully!');
+            };
+            croppedImg.src = croppedUrl;
+        } else {
+            showNotification('Crop failed - no data returned');
+            cropPreviewApplyBtn.disabled = false;
+            cropPreviewApplyBtn.textContent = 'Apply Crop';
+        }
+    } catch (error) {
+        console.error('Crop error:', error);
+        showNotification('Error applying crop: ' + error.message);
+        cropPreviewApplyBtn.disabled = false;
+        cropPreviewApplyBtn.textContent = 'Apply Crop';
+    }
+}
+
+// Skip crop and use full image
+function skipCropPreview() {
+    const imageDataUrl = cropPreviewImage.src;
+    
+    // Load the full image
+    const img = new Image();
+    img.onload = () => {
+        pageBackground.style.backgroundImage = `url(${imageDataUrl})`;
+        document.body.style.background = 'none';
+        
+        // Store original image data
+        appState.originalImageBlob = imageDataUrl;
+        appState.originalImageData = pageBackground.style.backgroundImage;
+        
+        // Update dimensions
+        appState.rawImageWidth = img.naturalWidth;
+        appState.rawImageHeight = img.naturalHeight;
+        
+        // Reset view
+        resetView();
+        
+        // Close modal
+        hideCropPreviewModal();
+        
+        showNotification('Image imported successfully. You can now use perspective transform.');
+    };
+    img.src = imageDataUrl;
+}
+
+// Hide crop preview modal
+function hideCropPreviewModal() {
+    cropPreviewModal.style.display = 'none';
+    cropPreviewImage.src = '';
+    clearCropPreviewSelection();
+    
+    // Remove event listeners
+    const container = document.querySelector('.crop-preview-container');
+    if (container) {
+        container.removeEventListener('mousedown', startCropPreviewDrawing);
+    }
+}
+
+// Initialize crop preview on DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+    initCropPreviewElements();
+});
 
 // Immediate initialization check
 console.log('=== APP.JS EXECUTING ===');

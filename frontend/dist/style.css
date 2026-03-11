@@ -1,0 +1,610 @@
+/* Modern reset */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    background-color: #001a33;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    --dialog-width: 360px; /* Container max-width (320px) + padding/margin (40px) */
+}
+
+.container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 320px;
+    width: 100%;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+}
+
+h1 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.4rem;
+}
+
+.intro {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.intro p {
+    color: #666;
+    margin: 4px 0;
+    font-size: 0.85rem;
+}
+
+.controls {
+    margin-bottom: 15px;
+}
+
+#yMaxInput {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: border-color 0.3s;
+    margin-bottom: 10px;
+}
+
+#yMaxInput:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.buttons {
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#standardBtn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+#standardBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+#addonBtn {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+#addonBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+}
+
+.image-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+#importBtn {
+    background: #4caf50;
+    color: white;
+    padding: 8px 16px;
+    flex: 0 0 auto;
+    font-size: 0.85rem;
+}
+
+#importBtn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f5f5f5;
+    padding: 8px 12px;
+    border-radius: 20px;
+}
+
+#zoomOut, #zoomIn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    padding: 0;
+    flex: 0 0 auto;
+}
+
+#zoomOut:hover, #zoomIn:hover {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+#zoomLevel {
+    font-weight: 600;
+    color: #333;
+    min-width: 50px;
+    text-align: center;
+}
+
+.status {
+    background: #f8f9fa;
+    border-left: 4px solid #667eea;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+#description {
+    color: #555;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.readings {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 15px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+#readingsOutput {
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    color: #333;
+    font-size: 0.8rem;
+}
+
+#pageBackground {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: calc(100vw - var(--dialog-width));
+    height: 100vh;
+    z-index: -1;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: center center;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    -webkit-transform-style: preserve-3d;
+    transform-style: preserve-3d;
+    isolation: isolate;
+    /* Force WebKit to create a new compositing layer */
+    border: 1px solid transparent;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+}
+
+#gridOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: calc(100vw - var(--dialog-width));
+    height: 100vh;
+    z-index: 10000;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='50' height='50' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 50 0 L 0 0 0 50' fill='none' stroke='rgba(255, 50, 50, 0.8)' stroke-width='2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)' /%3E%3C/svg%3E");
+    background-size: 50px 50px;
+    display: none;
+}
+
+#gridToggle {
+    background: #666;
+    color: white;
+    padding: 8px 16px;
+    flex: 0 0 auto;
+    font-size: 0.85rem;
+}
+
+#gridToggle:hover {
+    background: #555;
+    transform: translateY(-2px);
+}
+
+#gridToggle.active {
+    background: #00bcd4;
+}
+
+body.panning {
+    cursor: grabbing;
+}
+
+body.rotating {
+    cursor: grab;
+}
+
+body.shift-held #pageBackground {
+    cursor: grab;
+}
+
+/* Active mode indicators */
+.mode-active {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
+}
+
+/* Perspective controls UI */
+.perspective-controls-ui {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+#perspectiveToggle {
+    background: #666;
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+#perspectiveToggle:hover {
+    background: #555;
+    transform: translateY(-2px);
+}
+
+#perspectiveToggle.active {
+    background: #ff9800;
+}
+
+#applyPerspective {
+    background: #4caf50;
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+#applyPerspective:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+#resetPerspective {
+    background: #f44336;
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+#resetPerspective:hover {
+    background: #da190b;
+    transform: translateY(-2px);
+}
+
+/* Perspective corner handles container */
+#perspectiveControls {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: calc(100vw - var(--dialog-width));
+    height: 100vh;
+    z-index: 500;
+    pointer-events: none;
+}
+
+#perspectiveControls.active {
+    pointer-events: auto;
+}
+
+/* Corner handles */
+.corner-handle {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ff9800;
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    cursor: move;
+    z-index: 502;
+    pointer-events: auto;
+    transition: transform 0.1s, box-shadow 0.1s;
+    margin-left: -10px;
+    margin-top: -10px;
+}
+
+.corner-handle:hover {
+    transform: scale(1.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    background: #ff5722;
+}
+
+.corner-handle.dragging {
+    transform: scale(1.5);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
+    background: #e64a19;
+}
+
+/* Perspective lines connecting corners */
+#perspectiveLines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 501;
+}
+
+.perspective-line {
+    position: absolute;
+    background: #ff9800;
+    height: 2px;
+    transform-origin: left center;
+    pointer-events: none;
+    z-index: 501;
+}
+
+/* Canvas preview overlay */
+#perspectivePreview {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: calc(100vw - var(--dialog-width));
+    height: 100vh;
+    z-index: 400;
+    pointer-events: none;
+}
+
+/* Crop controls UI */
+.crop-controls-ui {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+#cropToggle {
+    background: #666;
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+#cropToggle:hover {
+    background: #555;
+    transform: translateY(-2px);
+}
+
+#cropToggle.active {
+    background: #9c27b0;
+}
+
+#applyCrop {
+    background: #4caf50;
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+#applyCrop:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+#cancelCrop {
+    background: #f44336;
+    color: white;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    flex: 1;
+}
+
+#cancelCrop:hover {
+    background: #da190b;
+    transform: translateY(-2px);
+}
+
+/* Crop overlay and selection */
+#cropOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: calc(100vw - var(--dialog-width));
+    height: 100vh;
+    z-index: 100;
+    pointer-events: none;
+    background: transparent;
+}
+
+#cropOverlay.active {
+    pointer-events: auto;
+    cursor: crosshair;
+}
+
+#cropSelection {
+    position: absolute;
+    border: 2px dashed #9c27b0;
+    background: rgba(156, 39, 176, 0.2);
+    pointer-events: none;
+    display: none;
+    z-index: 200;
+}
+
+#cropSelection.active {
+    display: block;
+}
+
+/* Resize handles for crop selection */
+.crop-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #9c27b0;
+    border: 2px solid white;
+    border-radius: 50%;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.crop-handle.tl { top: -6px; left: -6px; cursor: nw-resize; }
+.crop-handle.tr { top: -6px; right: -6px; cursor: ne-resize; }
+.crop-handle.bl { bottom: -6px; left: -6px; cursor: sw-resize; }
+.crop-handle.br { bottom: -6px; right: -6px; cursor: se-resize; }
+
+body.crop-mode {
+    cursor: crosshair;
+}
+
+/* Crop Preview Modal */
+#cropPreviewModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.crop-preview-content {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.crop-preview-content h2 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+.crop-preview-content p {
+    margin: 0 0 20px 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.crop-preview-container {
+    position: relative;
+    flex: 1;
+    min-height: 300px;
+    max-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: crosshair;
+}
+
+#cropPreviewImage {
+    max-width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+#cropPreviewSelection {
+    position: absolute;
+    border: 2px dashed #9c27b0;
+    background: rgba(156, 39, 176, 0.2);
+    pointer-events: none;
+    display: none;
+}
+
+#cropPreviewSelection.active {
+    display: block;
+}
+
+.crop-preview-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    justify-content: center;
+}
+
+.crop-preview-buttons button {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#cropPreviewApply {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+#cropPreviewApply:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+#cropPreviewApply:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+#cropPreviewSkip {
+    background: #f5f5f5;
+    color: #666;
+    border: 2px solid #ddd;
+}
+
+#cropPreviewSkip:hover {
+    background: #e0e0e0;
+    transform: translateY(-2px);
+}

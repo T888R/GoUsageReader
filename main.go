@@ -24,6 +24,12 @@ import (
 //go:embed all:frontend
 var assets embed.FS
 
+// ClickResult holds the result of a click operation
+type ClickResult struct {
+	Reading     string `json:"reading"`
+	Description string `json:"description"`
+}
+
 // App struct
 type App struct {
 	ctx          context.Context
@@ -219,11 +225,15 @@ func (a *App) GetAddonDescription() string {
 
 // HandleClick processes a click at the given Y coordinate
 // This is called from the frontend with the Y position relative to the image
-func (a *App) HandleClick(yPos int) (string, string, error) {
+func (a *App) HandleClick(yPos int) (*ClickResult, error) {
+	fmt.Printf("HandleClick called with yPos: %d\n", yPos)
+	fmt.Printf("Current state - maxYRes: %d, inputYMax: %d, clickCount: %d\n", a.maxYRes, a.inputYMax, a.clickCount)
+
 	// Calculate the position based on window height (maxYRes)
 	correct := a.maxYRes - yPos
 	pos := fmt.Sprint(correct)
 	yAxisLocation, _ := strconv.Atoi(pos)
+	fmt.Printf("Calculated yAxisLocation: %d\n", yAxisLocation)
 
 	var reading string
 	var desc string
@@ -283,11 +293,12 @@ func (a *App) HandleClick(yPos int) (string, string, error) {
 
 	a.clickCount++
 	desc = a.GetDescription()
-	return reading, desc, nil
+	fmt.Printf("HandleClick returning - reading: %q, desc: %q\n", reading, desc)
+	return &ClickResult{Reading: reading, Description: desc}, nil
 }
 
 // HandleAddonClick processes addon mode clicks at the given Y coordinate
-func (a *App) HandleAddonClick(yPos int) (string, string, error) {
+func (a *App) HandleAddonClick(yPos int) (*ClickResult, error) {
 	// Calculate the position based on window height (maxYRes)
 	correct := a.maxYRes - yPos
 	pos := fmt.Sprint(correct)
@@ -398,7 +409,7 @@ func (a *App) HandleAddonClick(yPos int) (string, string, error) {
 
 	a.clickCount++
 	desc = a.GetAddonDescription()
-	return reading, desc, nil
+	return &ClickResult{Reading: reading, Description: desc}, nil
 }
 
 // calcGraph calculates usage value from pixel position
@@ -417,7 +428,7 @@ func (a *App) calcGraph(ypos int) string {
 		correctedUsage = 0
 	}
 
-	return fmt.Sprintln(int(correctedUsage))
+	return fmt.Sprint(int(correctedUsage))
 }
 
 // calcAddonGraph calculates addon usage value
