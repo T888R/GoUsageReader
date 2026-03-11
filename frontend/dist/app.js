@@ -95,8 +95,48 @@ async function callGo(methodName, ...args) {
     }
 }
 
-// Image import
-importBtn.addEventListener('click', () => fileInput.click());
+// Helper function to extract reading from Wails result
+// Handles both array format [reading, desc, error] and object format {r0: reading, r1: desc, r2: error}
+function extractReading(result) {
+    if (!result) return '';
+    
+    // Check if it's an array (from mock runtime.js)
+    if (Array.isArray(result)) {
+        return result[0] || '';
+    }
+    
+    // Check if it's an object with numbered properties (Wails v2 format)
+    if (typeof result === 'object') {
+        // Wails v2 returns multiple values as r0, r1, r2, etc.
+        if (result.r0 !== undefined) {
+            return result.r0;
+        }
+        // Fallback: try to find any string property
+        for (const key in result) {
+            if (typeof result[key] === 'string' && result[key].length > 0) {
+                return result[key];
+            }
+        }
+    }
+    
+    // If it's a string, return it directly
+    if (typeof result === 'string') {
+        return result;
+    }
+    
+    return '';
+}
+
+// Image import - uses HTML file input
+if (importBtn && fileInput) {
+    importBtn.addEventListener('click', () => {
+        console.log('Import button clicked, triggering file input');
+        fileInput.click();
+    });
+    console.log('Import button listener attached successfully');
+} else {
+    console.error('Import button or file input not found:', { importBtn: !!importBtn, fileInput: !!fileInput });
+}
 
 // Grid toggle
 gridToggle.addEventListener('click', () => {
@@ -265,28 +305,65 @@ document.addEventListener('mouseup', () => {
 
 // Handle capture click - sends Y coordinate to backend
 async function handleCaptureClick(e) {
-    if (!appState.mode) return;
+    if (!appState.mode) {
+        console.log('handleCaptureClick: no mode active');
+        return;
+    }
     
     // Get click position relative to the window (for full-page background)
     const yPos = e.clientY;
+    console.log('handleCaptureClick: yPos =', yPos, 'windowHeight =', window.innerHeight, 'mode =', appState.mode);
     
     // Send to backend
     try {
         let result;
+        let reading = '';
         if (appState.mode === 'standard') {
+            console.log('Calling HandleClick with yPos:', yPos);
             result = await callGo("HandleClick", yPos);
+            console.log('HandleClick result type:', typeof result, 'value:', result);
+            // Wails returns multiple values as an object with properties
+            reading = extractReading(result);
+            console.log('Extracted reading:', reading);
             await updateDescription();
         } else {
+            console.log('Calling HandleAddonClick with yPos:', yPos);
             result = await callGo("HandleAddonClick", yPos);
+            console.log('HandleAddonClick result type:', typeof result, 'value:', result);
+            reading = extractReading(result);
+            console.log('Extracted reading:', reading);
             await updateAddonDescription();
         }
         
-        if (result && result[0]) {
-            readingsOutput.textContent += result[0] + '\n';
+        // Display the reading
+        if (reading) {
+            console.log('Displaying reading:', reading);
+            readingsOutput.textContent += reading + '\n';
             readingsOutput.scrollTop = readingsOutput.scrollHeight;
+            console.log('Reading displayed successfully');
+        } else {
+            console.warn('No reading to display. Result was:', result);
+        }
+        
+        // Check if mode was disabled after this click (e.g., after December)
+        // and update frontend state accordingly
+        let isModeActive = false;
+        if (appState.mode === 'standard') {
+            isModeActive = await callGo("IsRegularMode");
+        } else {
+            isModeActive = await callGo("IsAddonMode");
+        }
+        
+        if (!isModeActive) {
+            // Mode was disabled (e.g., after December click), reset frontend state
+            appState.mode = null;
+            standardBtn.classList.remove('mode-active');
+            addonBtn.classList.remove('mode-active');
+            showNotification('All months captured! Paste values to spreadsheet.');
         }
     } catch (err) {
         console.error('Error handling click:', err);
+        console.error('Error stack:', err.stack);
     }
 }
 
