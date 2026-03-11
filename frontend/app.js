@@ -1518,24 +1518,19 @@ async function applyPerspectiveTransform() {
             [appState.cornerPoints[3].x, appState.cornerPoints[3].y]
         ]);
         
-        // Convert base64 data URL to byte array
+        // Extract base64 data from data URL (backend expects base64 string)
         const base64Data = appState.originalImageBlob.split(',')[1];
-        const binaryString = atob(base64Data);
-        const imageData = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            imageData[i] = binaryString.charCodeAt(i);
-        }
         
         // Send to backend for transformation with raw image dimensions
         const transformedData = await callGo("ApplyPerspectiveTransform", 
-            imageData,
+            base64Data,
             appState.rawImageWidth,
             appState.rawImageHeight
         );
         
         if (transformedData && transformedData.length > 0) {
-            // Convert transformed data back to base64
-            const base64String = btoa(String.fromCharCode.apply(null, transformedData));
+            // Backend now returns base64 string directly
+            const base64String = typeof transformedData === 'string' ? transformedData : transformedData.toString();
             const transformedUrl = `data:image/png;base64,${base64String}`;
             
             // Update background with transformed image

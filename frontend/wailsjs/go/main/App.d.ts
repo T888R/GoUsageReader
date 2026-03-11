@@ -3,7 +3,7 @@
 
 export function ApplyCrop(arg1:string,arg2:number,arg3:number,arg4:number,arg5:number):Promise<Array<number>>;
 
-export function ApplyPerspectiveTransform(arg1:Array<number>,arg2:number,arg3:number):Promise<Array<number>>;
+export function ApplyPerspectiveTransform(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function ApplyPerspectiveTransformParallel(arg1:Array<number>,arg2:number,arg3:number,arg4:any,arg5:any):Promise<Array<number>>;
 

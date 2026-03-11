@@ -557,37 +557,76 @@ func (a *App) GetImageDimensions() (int, int) {
 }
 
 // ApplyPerspectiveTransform applies perspective transformation to the image data
+// imageDataBase64 is a base64 encoded image string
 // Uses parallel goroutines with 32-row chunks for optimal performance
-// Returns base64 encoded transformed image
-func (a *App) ApplyPerspectiveTransform(imageData []byte, width, height int) ([]byte, error) {
-	// Calculate output dimensions from corner points
+// Returns base64 encoded transformed image string
+func (a *App) ApplyPerspectiveTransform(imageDataBase64 string, width, height int) (string, error) {
+	// Decode base64 string to bytes
+	imageData, err := base64.StdEncoding.DecodeString(imageDataBase64)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64 image data: %w", err)
+	}
+
+	// Calculate output dimensions and offset from corner points
 	srcPoints := make([]image.Point, 4)
 	for i, point := range a.cornerPoints {
 		srcPoints[i] = image.Point{X: int(point[0]), Y: int(point[1])}
 	}
-	dstWidth, dstHeight := calculateOutputDimensions(srcPoints)
 
-	// Define source corners (original image bounds in screen space)
-	// These are the current corner points
-	srcCorners := a.cornerPoints
+	// Find bounding box and offset
+	minX, maxX := srcPoints[0].X, srcPoints[0].X
+	minY, maxY := srcPoints[0].Y, srcPoints[0].Y
+	for i := 1; i < 4; i++ {
+		if srcPoints[i].X < minX {
+			minX = srcPoints[i].X
+		}
+		if srcPoints[i].X > maxX {
+			maxX = srcPoints[i].X
+		}
+		if srcPoints[i].Y < minY {
+			minY = srcPoints[i].Y
+		}
+		if srcPoints[i].Y > maxY {
+			maxY = srcPoints[i].Y
+		}
+	}
 
-	// Define destination corners (rectangle at origin)
+	dstWidth := maxX - minX
+	dstHeight := maxY - minY
+	if dstWidth < 1 {
+		dstWidth = 1
+	}
+	if dstHeight < 1 {
+		dstHeight = 1
+	}
+
+	// Source corners are the full image bounds (0,0 to width,height)
+	var srcCorners [4][2]float64
+	srcCorners[0] = [2]float64{0, 0}                            // top-left
+	srcCorners[1] = [2]float64{float64(width), 0}               // top-right
+	srcCorners[2] = [2]float64{float64(width), float64(height)} // bottom-right
+	srcCorners[3] = [2]float64{0, float64(height)}              // bottom-left
+
+	// Destination corners are the dragged points, offset by minX/minY
 	var dstCorners [4][2]float64
-	dstCorners[0] = [2]float64{0, 0}                                          // top-left
-	dstCorners[1] = [2]float64{float64(dstWidth - 1), 0}                      // top-right
-	dstCorners[2] = [2]float64{float64(dstWidth - 1), float64(dstHeight - 1)} // bottom-right
-	dstCorners[3] = [2]float64{0, float64(dstHeight - 1)}                     // bottom-left
+	dstCorners[0] = [2]float64{float64(srcPoints[0].X - minX), float64(srcPoints[0].Y - minY)} // top-left
+	dstCorners[1] = [2]float64{float64(srcPoints[1].X - minX), float64(srcPoints[1].Y - minY)} // top-right
+	dstCorners[2] = [2]float64{float64(srcPoints[2].X - minX), float64(srcPoints[2].Y - minY)} // bottom-right
+	dstCorners[3] = [2]float64{float64(srcPoints[3].X - minX), float64(srcPoints[3].Y - minY)} // bottom-left
 
 	// Apply perspective transform using parallel processing
 	result, err := a.ApplyPerspectiveTransformParallel(imageData, dstWidth, dstHeight, srcCorners, dstCorners)
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply perspective transform: %w", err)
+		return "", fmt.Errorf("failed to apply perspective transform: %w", err)
 	}
+
+	// Encode result as base64 string
+	base64Result := base64.StdEncoding.EncodeToString(result)
 
 	// Store transformed image
 	a.transformedImg = result
 
-	return result, nil
+	return base64Result, nil
 }
 
 // GetTransformedImage returns the last transformed image
@@ -603,18 +642,38 @@ func (a *App) ResetPerspective() {
 }
 
 // calculateOutputDimensions calculates the output dimensions for perspective transform
+// Returns the axis-aligned bounding box that encompasses all corner points
 func calculateOutputDimensions(pts []image.Point) (int, int) {
-	// Calculate width - max of top and bottom edge lengths
-	widthTop := distance(pts[0], pts[1])
-	widthBottom := distance(pts[3], pts[2])
-	maxWidth := int(max(widthTop, widthBottom))
+	// Find min and max X/Y coordinates
+	minX, maxX := pts[0].X, pts[0].X
+	minY, maxY := pts[0].Y, pts[0].Y
 
-	// Calculate height - max of left and right edge lengths
-	heightLeft := distance(pts[0], pts[3])
-	heightRight := distance(pts[1], pts[2])
-	maxHeight := int(max(heightLeft, heightRight))
+	for i := 1; i < len(pts); i++ {
+		if pts[i].X < minX {
+			minX = pts[i].X
+		}
+		if pts[i].X > maxX {
+			maxX = pts[i].X
+		}
+		if pts[i].Y < minY {
+			minY = pts[i].Y
+		}
+		if pts[i].Y > maxY {
+			maxY = pts[i].Y
+		}
+	}
 
-	return maxWidth, maxHeight
+	width := maxX - minX
+	height := maxY - minY
+
+	if width < 1 {
+		width = 1
+	}
+	if height < 1 {
+		height = 1
+	}
+
+	return width, height
 }
 
 // distance calculates Euclidean distance between two points
