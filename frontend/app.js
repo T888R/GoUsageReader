@@ -731,7 +731,8 @@ function drawPerspectiveLines() {
     
     if (!appState.perspectiveMode) return;
     
-    const windowWidth = window.innerWidth;
+    const dialogWidth = 360; // Match CSS var(--dialog-width)
+    const windowWidth = window.innerWidth - dialogWidth;
     const windowHeight = window.innerHeight;
     
     // Define line pairs (connections)
@@ -784,7 +785,7 @@ function startDraggingCorner(e, cornerIndex) {
         }
         
         const dialogWidth = 360; // Match CSS var(--dialog-width)
-        const windowWidth = window.innerWidth - dialogWidth;
+    const windowWidth = window.innerWidth - dialogWidth;
         const windowHeight = window.innerHeight;
         const imgWidth = appState.rawImageWidth;
         const imgHeight = appState.rawImageHeight;
@@ -807,9 +808,9 @@ function startDraggingCorner(e, cornerIndex) {
         displayWidth *= zoom;
         displayHeight *= zoom;
         
-    // Calculate center position with pan offset (offset by half the dialog width to center in available space)
-    const centerX = windowWidth / 2 + appState.panX;
-    const centerY = windowHeight / 2 + appState.panY;
+        // Calculate center position with pan offset
+        const centerX = windowWidth / 2 + appState.panX;
+        const centerY = windowHeight / 2 + appState.panY;
         
         // Get mouse position
         const mouseX = e.clientX;

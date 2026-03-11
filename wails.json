@@ -4,12 +4,12 @@
   "outputfilename": "UsageReader",
   "frontend": {
     "dir": "./frontend",
-    "install": "npm install",
-    "build": "npm run build",
-    "package": "npm",
-    "dev": "npm run dev"
+    "install": "",
+    "build": "",
+    "package": "",
+    "dev": ""
   },
-  "assetdir": "./frontend/dist",
+  "assetdir": "./frontend",
   "wailsjsdir": "./frontend",
   "version": "2.0",
   "debounceMS": 100,
