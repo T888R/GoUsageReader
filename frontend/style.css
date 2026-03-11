@@ -12,6 +12,7 @@ body {
     display: flex;
     justify-content: center;
     padding: 20px;
+    --dialog-width: 360px; /* Container max-width (320px) + padding/margin (40px) */
 }
 
 .container {
@@ -193,7 +194,7 @@ button {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
+    width: calc(100vw - var(--dialog-width));
     height: 100vh;
     z-index: -1;
     background-size: contain;
@@ -216,14 +217,13 @@ button {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 0;
+    width: calc(100vw - var(--dialog-width));
+    height: 100vh;
+    z-index: 10000;
     pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='50' height='50' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 50 0 L 0 0 0 50' fill='none' stroke='rgba(255, 50, 50, 0.5)' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)' /%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='50' height='50' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 50 0 L 0 0 0 50' fill='none' stroke='rgba(255, 50, 50, 0.8)' stroke-width='2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)' /%3E%3C/svg%3E");
     background-size: 50px 50px;
+    display: none;
 }
 
 #gridToggle {
@@ -316,7 +316,7 @@ body.shift-held #pageBackground {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
+    width: calc(100vw - var(--dialog-width));
     height: 100vh;
     z-index: 500;
     pointer-events: none;
@@ -380,7 +380,7 @@ body.shift-held #pageBackground {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
+    width: calc(100vw - var(--dialog-width));
     height: 100vh;
     z-index: 400;
     pointer-events: none;
@@ -442,7 +442,7 @@ body.shift-held #pageBackground {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
+    width: calc(100vw - var(--dialog-width));
     height: 100vh;
     z-index: 100;
     pointer-events: none;

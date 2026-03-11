@@ -428,6 +428,7 @@ standardBtn.addEventListener('click', async () => {
         appState.mode = 'standard';
         standardBtn.classList.add('mode-active');
         addonBtn.classList.remove('mode-active');
+        document.body.style.cursor = 'crosshair';
         
         if (isGoAvailable()) {
             await callGo("SetYMax", value);
@@ -448,6 +449,7 @@ addonBtn.addEventListener('click', async () => {
         appState.mode = 'addon';
         addonBtn.classList.add('mode-active');
         standardBtn.classList.remove('mode-active');
+        document.body.style.cursor = 'crosshair';
         
         if (isGoAvailable()) {
             await callGo("SetYMax", value);
@@ -525,6 +527,7 @@ async function resetAll() {
     appState.mode = null;
     standardBtn.classList.remove('mode-active');
     addonBtn.classList.remove('mode-active');
+    document.body.style.cursor = '';
     yMaxInput.value = '';
     readingsOutput.textContent = '';
     description.textContent = 'Input y axis, hit enter, and click the top of the graph';
@@ -655,7 +658,8 @@ function disablePerspectiveMode() {
 
 // Get the actual displayed image bounds (accounting for contain and zoom)
 function getImageBounds() {
-    const windowWidth = window.innerWidth;
+    const dialogWidth = 360; // Match CSS var(--dialog-width)
+    const windowWidth = window.innerWidth - dialogWidth;
     const windowHeight = window.innerHeight;
     
     // Check if we have raw image dimensions stored
@@ -779,7 +783,8 @@ function startDraggingCorner(e, cornerIndex) {
             return;
         }
         
-        const windowWidth = window.innerWidth;
+        const dialogWidth = 360; // Match CSS var(--dialog-width)
+        const windowWidth = window.innerWidth - dialogWidth;
         const windowHeight = window.innerHeight;
         const imgWidth = appState.rawImageWidth;
         const imgHeight = appState.rawImageHeight;
@@ -802,9 +807,9 @@ function startDraggingCorner(e, cornerIndex) {
         displayWidth *= zoom;
         displayHeight *= zoom;
         
-        // Calculate center position with pan offset
-        const centerX = windowWidth / 2 + appState.panX;
-        const centerY = windowHeight / 2 + appState.panY;
+    // Calculate center position with pan offset (offset by half the dialog width to center in available space)
+    const centerX = windowWidth / 2 + appState.panX;
+    const centerY = windowHeight / 2 + appState.panY;
         
         // Get mouse position
         const mouseX = e.clientX;
@@ -861,7 +866,8 @@ function startDraggingCorner(e, cornerIndex) {
 function applyPerspectivePreview() {
     if (!appState.perspectiveMode || !appState.originalImageBlob) return;
     
-    const windowWidth = window.innerWidth;
+    const dialogWidth = 360; // Match CSS var(--dialog-width)
+    const windowWidth = window.innerWidth - dialogWidth;
     const windowHeight = window.innerHeight;
     
     // Get image bounds
@@ -877,8 +883,14 @@ function applyPerspectivePreview() {
         previewCanvas.style.top = '0';
         previewCanvas.style.left = '0';
         previewCanvas.style.pointerEvents = 'none';
-        previewCanvas.style.zIndex = '350';  // Below handles but above background
-        document.body.appendChild(previewCanvas);
+        previewCanvas.style.zIndex = '100';  // Below grid (10000) but above background
+        // Insert before gridOverlay so grid naturally stacks on top
+        const gridOverlay = document.getElementById('gridOverlay');
+        if (gridOverlay && gridOverlay.parentNode) {
+            gridOverlay.parentNode.insertBefore(previewCanvas, gridOverlay);
+        } else {
+            document.body.appendChild(previewCanvas);
+        }
     }
     
     // Source rectangle corners (original image display bounds)
@@ -1171,7 +1183,8 @@ function updateCornerPositions() {
         return;
     }
     
-    const windowWidth = window.innerWidth;
+    const dialogWidth = 360; // Match CSS var(--dialog-width)
+    const windowWidth = window.innerWidth - dialogWidth;
     const windowHeight = window.innerHeight;
     const imgWidth = appState.rawImageWidth;
     const imgHeight = appState.rawImageHeight;
@@ -1243,7 +1256,8 @@ function drawPerspectiveLines() {
         return;
     }
     
-    const windowWidth = window.innerWidth;
+    const dialogWidth = 360; // Match CSS var(--dialog-width)
+    const windowWidth = window.innerWidth - dialogWidth;
     const windowHeight = window.innerHeight;
     const imgWidth = appState.rawImageWidth;
     const imgHeight = appState.rawImageHeight;
