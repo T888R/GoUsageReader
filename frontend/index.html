@@ -1,78 +1,112 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Usage Reader</title>
-    <link rel="stylesheet" href="style.css?v=3">
-</head>
-<body>
+    <link rel="stylesheet" href="style.css?v=3" />
+  </head>
+  <body>
     <div id="pageBackground"></div>
-    <div id="gridOverlay" style="display: none;"></div>
-    
+    <div id="gridOverlay" style="display: none"></div>
+
     <!-- Perspective transform corner handles -->
-    <div id="perspectiveControls" style="display: none;">
-        <div class="corner-handle" id="corner-tl" data-corner="0" title="Top-left corner"></div>
-        <div class="corner-handle" id="corner-tr" data-corner="1" title="Top-right corner"></div>
-        <div class="corner-handle" id="corner-br" data-corner="2" title="Bottom-right corner"></div>
-        <div class="corner-handle" id="corner-bl" data-corner="3" title="Bottom-left corner"></div>
-        <div id="perspectiveLines"></div>
+    <div id="perspectiveControls" style="display: none">
+      <div
+        class="corner-handle"
+        id="corner-tl"
+        data-corner="0"
+        title="Top-left corner"
+      ></div>
+      <div
+        class="corner-handle"
+        id="corner-tr"
+        data-corner="1"
+        title="Top-right corner"
+      ></div>
+      <div
+        class="corner-handle"
+        id="corner-br"
+        data-corner="2"
+        title="Bottom-right corner"
+      ></div>
+      <div
+        class="corner-handle"
+        id="corner-bl"
+        data-corner="3"
+        title="Bottom-left corner"
+      ></div>
+      <div id="perspectiveLines"></div>
     </div>
-    
+
     <!-- Crop selection overlay -->
-    <div id="cropOverlay" style="display: none;">
-        <div id="cropSelection"></div>
+    <div id="cropOverlay" style="display: none">
+      <div id="cropSelection"></div>
     </div>
-    
+
     <div class="container">
-        <h1>Usage Reader</h1>
-        
-        <div class="intro">
-            <p>Welcome to Usage Reader.</p>
-            <p>Import a graph image, set the Y-axis max value, then click points on the graph.</p>
-        </div>
+      <h1>Usage Reader</h1>
 
-        <div class="controls">
-            <input type="number" id="yMaxInput" placeholder="Max number on Y axis" min="0">
-            
-            <div class="buttons">
-                <button id="standardBtn">Standard Usage</button>
-                <button id="addonBtn">Addon Usage</button>
-            </div>
-        </div>
+      <!-- <div class="intro"> -->
+      <!--     <p>Welcome to Usage Reader.</p> -->
+      <!--     <p>Import a graph image, set the Y-axis max value, then click points on the graph.</p> -->
+      <!-- </div> -->
 
-        <div class="image-controls">
-            <button id="importBtn">Import Image</button>
-            <button id="gridToggle">Grid: Off</button>
-            <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" style="display: none;">
-            <div class="zoom-controls">
-                <button id="zoomOut">-</button>
-                <span id="zoomLevel">100%</span>
-                <button id="zoomIn">+</button>
-            </div>
-        </div>
+      <div class="controls">
+        <input
+          type="number"
+          id="yMaxInput"
+          placeholder="Max number on Y axis"
+          min="0"
+        />
 
-        <div class="perspective-controls-ui">
-            <button id="perspectiveToggle">Perspective: Off</button>
-            <button id="applyPerspective" style="display: none;">Apply Transform</button>
-            <button id="resetPerspective" style="display: none;">Reset Corners</button>
+        <div class="buttons">
+          <button id="standardBtn">Standard Usage</button>
+          <button id="addonBtn">Addon Usage</button>
         </div>
+      </div>
 
-        <div class="crop-controls-ui">
-            <button id="cropToggle">Crop: Off</button>
-            <button id="applyCrop" style="display: none;">Apply Crop</button>
-            <button id="cancelCrop" style="display: none;">Cancel</button>
+      <div class="image-controls">
+        <button id="importBtn">Import Image</button>
+        <button id="gridToggle">Grid: Off</button>
+        <input
+          type="file"
+          id="fileInput"
+          accept=".png,.jpg,.jpeg,.gif,.bmp,.webp"
+          style="display: none"
+        />
+        <div class="zoom-controls">
+          <button id="zoomOut">-</button>
+          <span id="zoomLevel">100%</span>
+          <button id="zoomIn">+</button>
         </div>
+      </div>
 
-        <div class="status">
-            <p id="description">Import an image and enter Y-axis max to begin</p>
-        </div>
+      <div class="perspective-controls-ui">
+        <button id="perspectiveToggle">Perspective: Off</button>
+        <button id="applyPerspective" style="display: none">
+          Apply Transform
+        </button>
+        <button id="resetPerspective" style="display: none">
+          Reset Corners
+        </button>
+      </div>
 
-        <div class="readings">
-            <pre id="readingsOutput"></pre>
-        </div>
+      <div class="crop-controls-ui">
+        <button id="cropToggle">Crop: Off</button>
+        <button id="applyCrop" style="display: none">Apply Crop</button>
+        <button id="cancelCrop" style="display: none">Cancel</button>
+      </div>
+
+      <div class="status">
+        <p id="description">Import an image and enter Y-axis max to begin</p>
+      </div>
+
+      <div class="readings">
+        <pre id="readingsOutput"></pre>
+      </div>
     </div>
 
     <script src="app.js"></script>
-</body>
+  </body>
 </html>
