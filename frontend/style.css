@@ -184,8 +184,8 @@ button {
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 15px;
-    max-height: 150px;
-    overflow-y: auto;
+    max-height: none;
+    overflow-y: visible;
 }
 
 #readingsOutput {
