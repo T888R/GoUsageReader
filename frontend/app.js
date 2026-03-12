@@ -497,14 +497,8 @@ async function updateAddonDescription() {
 // Listen for auto-paste event from backend
 if (window.runtime && window.runtime.EventsOn) {
     window.runtime.EventsOn('auto-paste', (data) => {
-        // Copy to clipboard for the user to paste manually
-        navigator.clipboard.writeText(data).then(() => {
-            console.log('Data copied to clipboard');
-            showNotification('Data copied to clipboard! Press Ctrl+V to paste.');
-        }).catch(err => {
-            console.error('Failed to copy to clipboard:', err);
-            showNotification('Auto-paste failed. Please copy manually from the readings panel.');
-        });
+        // Show notification that Alt+V hotkey is ready
+        showNotification('Data ready! Press Alt+V in your browser to paste values.');
     });
 }
 

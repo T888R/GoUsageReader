@@ -13,7 +13,10 @@ import (
 	"math"
 	"strconv"
 	"sync"
+	"time"
 
+	"github.com/go-vgo/robotgo"
+	hook "github.com/robotn/gohook"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -41,6 +44,7 @@ type App struct {
 	lowerBound   int
 	regularUsage bool
 	addonUsage   bool
+	hasPasted    bool // Tracks if values have been pasted (prevents double-paste)
 
 	// Month values
 	january   string
@@ -86,10 +90,87 @@ func NewApp() *App {
 // OnStartup is called when the app starts
 func (a *App) OnStartup(ctx context.Context) {
 	a.ctx = ctx
+	// Start global hotkey listener in background
+	go a.startGlobalHotkeyListener()
 }
 
 // OnShutdown is called when the app shuts down
 func (a *App) OnShutdown(ctx context.Context) {
+}
+
+// startGlobalHotkeyListener registers Alt+V globally and listens for the hotkey
+func (a *App) startGlobalHotkeyListener() {
+	fmt.Println("[DEBUG] Starting global hotkey listener...")
+
+	// Register 'v' key as global hotkey
+	// Using KeyUp so it only triggers once when key is released
+	hook.Register(hook.KeyUp, []string{"v"}, func(e hook.Event) {
+		fmt.Println("[DEBUG] 'v' hotkey detected!")
+		a.typeMonthlyValues()
+	})
+	fmt.Println("[DEBUG] Hook registered for 'v' key")
+
+	fmt.Println("[DEBUG] Starting hook event loop...")
+	s := hook.Start()
+	fmt.Println("[DEBUG] Hook started, waiting for events...")
+	<-hook.Process(s)
+	fmt.Println("[DEBUG] Hook process ended")
+}
+
+// areAllValuesFilled checks if all 12 monthly values have been set
+func (a *App) areAllValuesFilled() bool {
+	return a.january != "" && a.february != "" && a.march != "" &&
+		a.april != "" && a.may != "" && a.june != "" &&
+		a.july != "" && a.august != "" && a.september != "" &&
+		a.october != "" && a.november != "" && a.december != ""
+}
+
+// typeMonthlyValues types all monthly values with tabs between them
+// Only works if all values are filled and hasn't been pasted yet
+func (a *App) typeMonthlyValues() {
+	fmt.Println("[DEBUG] typeMonthlyValues called")
+	fmt.Printf("[DEBUG] hasPasted: %v\n", a.hasPasted)
+	fmt.Printf("[DEBUG] Values - Jan: '%s', Feb: '%s', Mar: '%s', Apr: '%s', May: '%s', Jun: '%s'\n",
+		a.january, a.february, a.march, a.april, a.may, a.june)
+	fmt.Printf("[DEBUG] Values - Jul: '%s', Aug: '%s', Sep: '%s', Oct: '%s', Nov: '%s', Dec: '%s'\n",
+		a.july, a.august, a.september, a.october, a.november, a.december)
+
+	// Check if values are ready and not already pasted
+	if !a.areAllValuesFilled() {
+		fmt.Println("[DEBUG] Not all values are filled, skipping")
+		return
+	}
+	if a.hasPasted {
+		fmt.Println("[DEBUG] Already pasted, skipping")
+		return
+	}
+
+	fmt.Println("[DEBUG] All checks passed, starting to type...")
+
+	// Mark as pasted to prevent double-triggering
+	a.hasPasted = true
+
+	// Type all values with tabs in between
+	values := []string{a.january, a.february, a.march, a.april, a.may, a.june,
+		a.july, a.august, a.september, a.october, a.november, a.december}
+
+	for i, value := range values {
+		fmt.Printf("[DEBUG] Typing value %d: '%s'\n", i+1, value)
+		robotgo.TypeStr(value)
+		// Add tab between values (not after the last one)
+		if i < len(values)-1 {
+			fmt.Println("[DEBUG] Pressing Tab")
+			robotgo.KeyTap("tab")
+			time.Sleep(10 * time.Millisecond) // 10ms delay as requested
+		}
+	}
+
+	fmt.Println("[DEBUG] Finished typing, resetting...")
+
+	// Reset after typing is complete
+	go func() {
+		a.Reset()
+	}()
 }
 
 // SetWindowHeight sets the window height and calculates maxYRes from it
@@ -159,7 +240,7 @@ func (a *App) GetDescription() string {
 	case 13:
 		return "Click December"
 	default:
-		return "Usage calculation completed. Click v with January field selected to paste"
+		return "Usage calculation completed. Press Alt+V with January field selected to paste"
 	}
 }
 
@@ -219,7 +300,7 @@ func (a *App) GetAddonDescription() string {
 	case 25:
 		return "Click December production"
 	default:
-		return "Usage calculation completed. Click v with January field selected to paste"
+		return "Usage calculation completed. Press Alt+V with January field selected to paste"
 	}
 }
 
@@ -459,22 +540,12 @@ func (a *App) calcNet(consumption, production int) string {
 	return fmt.Sprint(net)
 }
 
-// autoPaste automatically pastes results using Wails runtime
-// This simulates keyboard input to paste the calculated values
+// autoPaste notifies the frontend that data is ready to be pasted
+// The actual pasting is done via the global Alt+V hotkey
 func (a *App) autoPaste() {
-	// Build the string with all values separated by tabs
-	allData := a.january + "\t" + a.february + "\t" + a.march + "\t" +
-		a.april + "\t" + a.may + "\t" + a.june + "\t" +
-		a.july + "\t" + a.august + "\t" + a.september + "\t" +
-		a.october + "\t" + a.november + "\t" + a.december
-
-	// Emit an event to the frontend to trigger the paste
-	wailsruntime.EventsEmit(a.ctx, "auto-paste", allData)
-
-	// Reset after a short delay
-	go func() {
-		a.Reset()
-	}()
+	// Emit an event to notify the frontend that data is ready
+	// User should press Alt+V to paste into the focused application
+	wailsruntime.EventsEmit(a.ctx, "auto-paste", "Press Alt+V to paste values into the focused field")
 }
 
 // Reset resets the application state
@@ -485,6 +556,7 @@ func (a *App) Reset() {
 	a.inputYMax = 0
 	a.regularUsage = false
 	a.addonUsage = false
+	a.hasPasted = false // Reset the pasted flag so new values can be pasted
 	a.january = ""
 	a.february = ""
 	a.march = ""
