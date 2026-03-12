@@ -17,6 +17,7 @@ body {
     justify-content: center;
     padding: 20px;
     --dialog-width: 360px; /* Container max-width (320px) + padding/margin (40px) */
+    --left-padding: 40px; /* Left padding for image area */
 }
 
 .container {
@@ -198,7 +199,8 @@ button {
     position: fixed;
     top: 0;
     left: 0;
-    width: calc(100vw - var(--dialog-width));
+    width: calc(100vw - var(--dialog-width) - var(--left-padding));
+    margin-left: var(--left-padding);
     height: 100vh;
     z-index: -1;
     background-size: contain;
@@ -221,7 +223,8 @@ button {
     position: fixed;
     top: 0;
     left: 0;
-    width: calc(100vw - var(--dialog-width));
+    width: calc(100vw - var(--dialog-width) - var(--left-padding));
+    margin-left: var(--left-padding);
     height: 100vh;
     z-index: 10000;
     pointer-events: none;
@@ -320,7 +323,8 @@ body.shift-held #pageBackground {
     position: fixed;
     top: 0;
     left: 0;
-    width: calc(100vw - var(--dialog-width));
+    width: calc(100vw - var(--dialog-width) - var(--left-padding));
+    margin-left: var(--left-padding);
     height: 100vh;
     z-index: 500;
     pointer-events: none;
@@ -384,7 +388,8 @@ body.shift-held #pageBackground {
     position: fixed;
     top: 0;
     left: 0;
-    width: calc(100vw - var(--dialog-width));
+    width: calc(100vw - var(--dialog-width) - var(--left-padding));
+    margin-left: var(--left-padding);
     height: 100vh;
     z-index: 400;
     pointer-events: none;
@@ -446,7 +451,8 @@ body.shift-held #pageBackground {
     position: fixed;
     top: 0;
     left: 0;
-    width: calc(100vw - var(--dialog-width));
+    width: calc(100vw - var(--dialog-width) - var(--left-padding));
+    margin-left: var(--left-padding);
     height: 100vh;
     z-index: 100;
     pointer-events: none;

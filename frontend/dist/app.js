@@ -669,7 +669,8 @@ function disablePerspectiveMode() {
 // Get the actual displayed image bounds (accounting for contain and zoom)
 function getImageBounds() {
     const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const windowWidth = window.innerWidth - dialogWidth;
+    const leftPadding = 40; // Match CSS var(--left-padding)
+    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
     const windowHeight = window.innerHeight;
     
     // Check if we have raw image dimensions stored
@@ -702,7 +703,7 @@ function getImageBounds() {
     displayHeight *= appState.zoom;
     
     // Calculate center position with pan offset
-    const centerX = windowWidth / 2 + appState.panX;
+    const centerX = leftPadding + windowWidth / 2 + appState.panX;
     const centerY = windowHeight / 2 + appState.panY;
     
     // Calculate actual image bounds
@@ -742,7 +743,8 @@ function drawPerspectiveLines() {
     if (!appState.perspectiveMode) return;
     
     const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const windowWidth = window.innerWidth - dialogWidth;
+    const leftPadding = 40; // Match CSS var(--left-padding)
+    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
     const windowHeight = window.innerHeight;
     
     // Define line pairs (connections)
@@ -795,7 +797,8 @@ function startDraggingCorner(e, cornerIndex) {
         }
         
         const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const windowWidth = window.innerWidth - dialogWidth;
+    const leftPadding = 40; // Match CSS var(--left-padding)
+    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
         const windowHeight = window.innerHeight;
         const imgWidth = appState.rawImageWidth;
         const imgHeight = appState.rawImageHeight;
@@ -819,7 +822,7 @@ function startDraggingCorner(e, cornerIndex) {
         displayHeight *= zoom;
         
         // Calculate center position with pan offset
-        const centerX = windowWidth / 2 + appState.panX;
+        const centerX = leftPadding + windowWidth / 2 + appState.panX;
         const centerY = windowHeight / 2 + appState.panY;
         
         // Get mouse position
@@ -878,7 +881,8 @@ function applyPerspectivePreview() {
     if (!appState.perspectiveMode || !appState.originalImageBlob) return;
     
     const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const windowWidth = window.innerWidth - dialogWidth;
+    const leftPadding = 40; // Match CSS var(--left-padding)
+    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
     const windowHeight = window.innerHeight;
     
     // Get image bounds
@@ -1195,7 +1199,8 @@ function updateCornerPositions() {
     }
     
     const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const windowWidth = window.innerWidth - dialogWidth;
+    const leftPadding = 40; // Match CSS var(--left-padding)
+    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
     const windowHeight = window.innerHeight;
     const imgWidth = appState.rawImageWidth;
     const imgHeight = appState.rawImageHeight;
@@ -1219,7 +1224,7 @@ function updateCornerPositions() {
     displayHeight *= zoom;
     
     // Calculate center position with pan offset
-    const centerX = windowWidth / 2 + appState.panX;
+    const centerX = leftPadding + windowWidth / 2 + appState.panX;
     const centerY = windowHeight / 2 + appState.panY;
     
     // For CSS transforms, the order is: translate -> scale -> rotate
@@ -1244,7 +1249,7 @@ function updateCornerPositions() {
         const rotatedY = scaledX * sin + scaledY * cos;
         
         // Add center position (includes pan)
-        const screenX = centerX + rotatedX;
+        const screenX = centerX + rotatedX - leftPadding;
         const screenY = centerY + rotatedY;
         
         handle.style.left = `${screenX}px`;
@@ -1268,7 +1273,8 @@ function drawPerspectiveLines() {
     }
     
     const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const windowWidth = window.innerWidth - dialogWidth;
+    const leftPadding = 40; // Match CSS var(--left-padding)
+    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
     const windowHeight = window.innerHeight;
     const imgWidth = appState.rawImageWidth;
     const imgHeight = appState.rawImageHeight;
@@ -1292,7 +1298,7 @@ function drawPerspectiveLines() {
     displayHeight *= zoom;
     
     // Calculate center position with pan offset
-    const centerX = windowWidth / 2 + appState.panX;
+    const centerX = leftPadding + windowWidth / 2 + appState.panX;
     const centerY = windowHeight / 2 + appState.panY;
     
     // For CSS transforms, the order is: translate -> scale -> rotate
@@ -1316,7 +1322,7 @@ function drawPerspectiveLines() {
         
         // Add center position (includes pan)
         return {
-            x: centerX + rotatedX,
+            x: centerX + rotatedX - leftPadding,
             y: centerY + rotatedY
         };
     };
