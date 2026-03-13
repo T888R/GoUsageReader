@@ -233,6 +233,7 @@ button {
     margin-left: var(--left-padding);
     height: 100vh;
     z-index: -1;
+    background-color: var(--ctp-crust);
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
@@ -244,7 +245,6 @@ button {
     transform-style: preserve-3d;
     isolation: isolate;
     /* Force WebKit to create a new compositing layer */
-    border: 1px solid transparent;
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
 }

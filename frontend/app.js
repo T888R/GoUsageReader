@@ -2674,7 +2674,7 @@ console.log('  cancelCropImpl:', typeof cancelCropImpl);
 
 // Set initial background color on startup
 if (pageBackground) {
-    pageBackground.style.backgroundColor = '#001a33';
+    pageBackground.style.backgroundColor = '#11111b';
 }
 
 console.log('Usage Reader with perspective transform and crop tool initialized');
