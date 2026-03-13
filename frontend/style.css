@@ -1,3 +1,33 @@
+/* Catppuccin Mocha Color Palette */
+:root {
+    --ctp-base: #1e1e2e;
+    --ctp-mantle: #181825;
+    --ctp-crust: #11111b;
+    --ctp-surface0: #313244;
+    --ctp-surface1: #45475a;
+    --ctp-surface2: #585b70;
+    --ctp-overlay0: #6c7086;
+    --ctp-overlay1: #7f849c;
+    --ctp-overlay2: #9399b2;
+    --ctp-subtext0: #a6adc8;
+    --ctp-subtext1: #bac2de;
+    --ctp-text: #cdd6f4;
+    --ctp-lavender: #b4befe;
+    --ctp-blue: #89b4fa;
+    --ctp-sapphire: #74c7ec;
+    --ctp-sky: #89dceb;
+    --ctp-teal: #94e2d5;
+    --ctp-green: #a6e3a1;
+    --ctp-yellow: #f9e2af;
+    --ctp-peach: #fab387;
+    --ctp-maroon: #eba0ac;
+    --ctp-red: #f38ba8;
+    --ctp-mauve: #cba6f7;
+    --ctp-pink: #f5c2e7;
+    --ctp-flamingo: #f2cdcd;
+    --ctp-rosewater: #f5e0dc;
+}
+
 /* Modern reset */
 *, *::before, *::after {
     box-sizing: border-box;
@@ -6,12 +36,12 @@
 }
 
 html {
-    background-color: #001a33;
+    background-color: var(--ctp-crust);
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--ctp-lavender) 0%, var(--ctp-blue) 100%);
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -21,10 +51,10 @@ body {
 }
 
 .container {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(30, 30, 46, 0.95);
     border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     max-width: 320px;
     width: 100%;
     position: fixed;
@@ -36,7 +66,7 @@ body {
 }
 
 h1 {
-    color: #333;
+    color: var(--ctp-text);
     text-align: center;
     margin-bottom: 15px;
     font-size: 1.4rem;
@@ -48,7 +78,7 @@ h1 {
 }
 
 .intro p {
-    color: #666;
+    color: var(--ctp-subtext0);
     margin: 4px 0;
     font-size: 0.85rem;
 }
@@ -60,7 +90,7 @@ h1 {
 #yMaxInput {
     width: 100%;
     padding: 10px 12px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--ctp-surface0);
     border-radius: 8px;
     font-size: 0.9rem;
     transition: border-color 0.3s;
@@ -69,7 +99,7 @@ h1 {
 
 #yMaxInput:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: var(--ctp-lavender);
 }
 
 .buttons {
@@ -89,23 +119,23 @@ button {
 }
 
 #standardBtn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--ctp-lavender) 0%, var(--ctp-blue) 100%);
     color: white;
 }
 
 #standardBtn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 5px 15px rgba(114, 135, 253, 0.4);
 }
 
 #addonBtn {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: linear-gradient(135deg, var(--ctp-pink) 0%, var(--ctp-mauve) 100%);
     color: white;
 }
 
 #addonBtn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+    box-shadow: 0 5px 15px rgba(234, 118, 203, 0.4);
 }
 
 .image-controls {
@@ -117,7 +147,7 @@ button {
 }
 
 #importBtn {
-    background: #4caf50;
+    background: var(--ctp-green);
     color: white;
     padding: 8px 16px;
     flex: 0 0 auto;
@@ -125,7 +155,7 @@ button {
 }
 
 #importBtn:hover {
-    background: #45a049;
+    background: #369424;
     transform: translateY(-2px);
 }
 
@@ -133,7 +163,7 @@ button {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #f5f5f5;
+    background: var(--ctp-surface0);
     padding: 8px 12px;
     border-radius: 20px;
 }
@@ -142,8 +172,8 @@ button {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: #fff;
-    border: 2px solid #ddd;
+    background: var(--ctp-surface1);
+    border: 2px solid var(--ctp-surface1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -153,34 +183,34 @@ button {
 }
 
 #zoomOut:hover, #zoomIn:hover {
-    background: #667eea;
+    background: var(--ctp-lavender);
     color: white;
-    border-color: #667eea;
+    border-color: var(--ctp-lavender);
 }
 
 #zoomLevel {
     font-weight: 600;
-    color: #333;
+    color: var(--ctp-text);
     min-width: 50px;
     text-align: center;
 }
 
 .status {
-    background: #f8f9fa;
-    border-left: 4px solid #667eea;
+    background: var(--ctp-mantle);
+    border-left: 4px solid var(--ctp-lavender);
     padding: 10px;
     margin-bottom: 15px;
     border-radius: 4px;
 }
 
 #description {
-    color: #555;
+    color: var(--ctp-subtext1);
     font-weight: 500;
     font-size: 0.85rem;
 }
 
 .readings {
-    background: #f8f9fa;
+    background: var(--ctp-mantle);
     border-radius: 8px;
     padding: 10px;
     margin-bottom: 15px;
@@ -191,7 +221,7 @@ button {
 #readingsOutput {
     white-space: pre-wrap;
     font-family: 'Courier New', monospace;
-    color: #333;
+    color: var(--ctp-text);
     font-size: 0.8rem;
 }
 
@@ -228,13 +258,13 @@ button {
     height: 100vh;
     z-index: 10000;
     pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='50' height='50' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 50 0 L 0 0 0 50' fill='none' stroke='rgba(255, 50, 50, 0.8)' stroke-width='2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)' /%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='50' height='50' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 50 0 L 0 0 0 50' fill='none' stroke='rgba(254, 100, 11, 0.8)' stroke-width='2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)' /%3E%3C/svg%3E");
     background-size: 50px 50px;
     display: none;
 }
 
 #gridToggle {
-    background: #666;
+    background: var(--ctp-overlay1);
     color: white;
     padding: 8px 16px;
     flex: 0 0 auto;
@@ -242,12 +272,12 @@ button {
 }
 
 #gridToggle:hover {
-    background: #555;
+    background: var(--ctp-overlay2);
     transform: translateY(-2px);
 }
 
 #gridToggle.active {
-    background: #00bcd4;
+    background: var(--ctp-teal);
 }
 
 body.panning {
@@ -264,7 +294,7 @@ body.shift-held #pageBackground {
 
 /* Active mode indicators */
 .mode-active {
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 0 0 3px rgba(114, 135, 253, 0.5);
 }
 
 /* Perspective controls UI */
@@ -276,7 +306,7 @@ body.shift-held #pageBackground {
 }
 
 #perspectiveToggle {
-    background: #666;
+    background: var(--ctp-overlay1);
     color: white;
     padding: 8px 16px;
     font-size: 0.85rem;
@@ -284,16 +314,16 @@ body.shift-held #pageBackground {
 }
 
 #perspectiveToggle:hover {
-    background: #555;
+    background: var(--ctp-overlay2);
     transform: translateY(-2px);
 }
 
 #perspectiveToggle.active {
-    background: #ff9800;
+    background: var(--ctp-peach);
 }
 
 #applyPerspective {
-    background: #4caf50;
+    background: var(--ctp-green);
     color: white;
     padding: 8px 16px;
     font-size: 0.85rem;
@@ -301,12 +331,12 @@ body.shift-held #pageBackground {
 }
 
 #applyPerspective:hover {
-    background: #45a049;
+    background: #369424;
     transform: translateY(-2px);
 }
 
 #resetPerspective {
-    background: #f44336;
+    background: var(--ctp-red);
     color: white;
     padding: 8px 16px;
     font-size: 0.85rem;
@@ -314,7 +344,7 @@ body.shift-held #pageBackground {
 }
 
 #resetPerspective:hover {
-    background: #da190b;
+    background: #b50d2f;
     transform: translateY(-2px);
 }
 
@@ -340,7 +370,7 @@ body.shift-held #pageBackground {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #ff9800;
+    background: var(--ctp-peach);
     border: 3px solid white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     cursor: move;
@@ -354,13 +384,13 @@ body.shift-held #pageBackground {
 .corner-handle:hover {
     transform: scale(1.3);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-    background: #ff5722;
+    background: var(--ctp-maroon);
 }
 
 .corner-handle.dragging {
     transform: scale(1.5);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.7);
-    background: #e64a19;
+    background: var(--ctp-red);
 }
 
 /* Perspective lines connecting corners */
@@ -376,7 +406,7 @@ body.shift-held #pageBackground {
 
 .perspective-line {
     position: absolute;
-    background: #ff9800;
+    background: var(--ctp-peach);
     height: 2px;
     transform-origin: left center;
     pointer-events: none;
@@ -404,7 +434,7 @@ body.shift-held #pageBackground {
 }
 
 #cropToggle {
-    background: #666;
+    background: var(--ctp-overlay1);
     color: white;
     padding: 8px 16px;
     font-size: 0.85rem;
@@ -412,16 +442,16 @@ body.shift-held #pageBackground {
 }
 
 #cropToggle:hover {
-    background: #555;
+    background: var(--ctp-overlay2);
     transform: translateY(-2px);
 }
 
 #cropToggle.active {
-    background: #9c27b0;
+    background: var(--ctp-mauve);
 }
 
 #applyCrop {
-    background: #4caf50;
+    background: var(--ctp-green);
     color: white;
     padding: 8px 16px;
     font-size: 0.85rem;
@@ -429,12 +459,12 @@ body.shift-held #pageBackground {
 }
 
 #applyCrop:hover {
-    background: #45a049;
+    background: #369424;
     transform: translateY(-2px);
 }
 
 #cancelCrop {
-    background: #f44336;
+    background: var(--ctp-red);
     color: white;
     padding: 8px 16px;
     font-size: 0.85rem;
@@ -442,7 +472,7 @@ body.shift-held #pageBackground {
 }
 
 #cancelCrop:hover {
-    background: #da190b;
+    background: #b50d2f;
     transform: translateY(-2px);
 }
 
@@ -466,8 +496,8 @@ body.shift-held #pageBackground {
 
 #cropSelection {
     position: absolute;
-    border: 2px dashed #9c27b0;
-    background: rgba(156, 39, 176, 0.2);
+    border: 2px dashed var(--ctp-mauve);
+    background: rgba(136, 57, 239, 0.2);
     pointer-events: none;
     display: none;
     z-index: 200;
@@ -482,7 +512,7 @@ body.shift-held #pageBackground {
     position: absolute;
     width: 12px;
     height: 12px;
-    background: #9c27b0;
+    background: var(--ctp-mauve);
     border: 2px solid white;
     border-radius: 50%;
     pointer-events: auto;
@@ -505,7 +535,7 @@ body.crop-mode {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(17, 17, 27, 0.85);
     z-index: 10000;
     display: flex;
     align-items: center;
@@ -514,7 +544,7 @@ body.crop-mode {
 }
 
 .crop-preview-content {
-    background: white;
+    background: var(--ctp-surface0);
     border-radius: 12px;
     padding: 25px;
     max-width: 90vw;
@@ -526,13 +556,13 @@ body.crop-mode {
 
 .crop-preview-content h2 {
     margin: 0 0 10px 0;
-    color: #333;
+    color: var(--ctp-text);
     font-size: 1.5rem;
 }
 
 .crop-preview-content p {
     margin: 0 0 20px 0;
-    color: #666;
+    color: var(--ctp-subtext0);
     font-size: 0.9rem;
 }
 
@@ -544,7 +574,7 @@ body.crop-mode {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f5f5f5;
+    background: var(--ctp-surface0);
     border-radius: 8px;
     overflow: hidden;
     cursor: crosshair;
@@ -560,8 +590,8 @@ body.crop-mode {
 
 #cropPreviewSelection {
     position: absolute;
-    border: 2px dashed #9c27b0;
-    background: rgba(156, 39, 176, 0.2);
+    border: 2px dashed var(--ctp-mauve);
+    background: rgba(136, 57, 239, 0.2);
     pointer-events: none;
     display: none;
 }
@@ -588,29 +618,29 @@ body.crop-mode {
 }
 
 #cropPreviewApply {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--ctp-lavender) 0%, var(--ctp-blue) 100%);
     color: white;
 }
 
 #cropPreviewApply:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 5px 15px rgba(114, 135, 253, 0.4);
 }
 
 #cropPreviewApply:disabled {
-    background: #ccc;
+    background: var(--ctp-surface1);
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
 }
 
 #cropPreviewSkip {
-    background: #f5f5f5;
-    color: #666;
-    border: 2px solid #ddd;
+    background: var(--ctp-surface0);
+    color: var(--ctp-subtext1);
+    border: 2px solid var(--ctp-surface1);
 }
 
 #cropPreviewSkip:hover {
-    background: #e0e0e0;
+    background: var(--ctp-surface1);
     transform: translateY(-2px);
 }

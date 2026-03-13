@@ -11,6 +11,7 @@ import (
 	_ "image/jpeg" // Register JPEG decoder
 	"image/png"
 	"math"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -508,7 +509,7 @@ func (a *App) calcGraph(ypos int) string {
 	}
 
 	usage = (float32(ypos) - float32(a.lowerBound)) / (float32(a.upperBound) - float32(a.lowerBound))
-	correctedUsage = float32(a.inputYMax) * (usage * 1.01)
+	correctedUsage = float32(a.inputYMax) * (usage * 1.001)
 
 	if correctedUsage < 0 {
 		correctedUsage = 0
@@ -553,7 +554,7 @@ func (a *App) autoPaste() {
 	wailsruntime.EventsEmit(a.ctx, "auto-paste", "Press Alt+V to paste values into the focused field")
 }
 
-// Reset resets the application state
+// Reset resets the application state and frees memory
 func (a *App) Reset() {
 	a.clickCount = 0
 	a.upperBound = 0
@@ -588,6 +589,14 @@ func (a *App) Reset() {
 	a.octA, a.octB = 0, 0
 	a.novA, a.novB = 0, 0
 	a.decA, a.decB = 0, 0
+
+	// Free large memory allocations
+	if a.transformedImg != nil {
+		a.transformedImg = nil
+	}
+
+	// Hint to GC to clean up freed memory
+	runtime.GC()
 }
 
 // GetAllReadings returns all month readings as a formatted string
@@ -649,6 +658,11 @@ func (a *App) GetImageDimensions() (int, int) {
 // Uses parallel goroutines with 32-row chunks for optimal performance
 // Returns base64 encoded transformed image string
 func (a *App) ApplyPerspectiveTransform(imageDataBase64 string, width, height int) (string, error) {
+	// Clear previous transformed image to free memory before processing new one
+	if a.transformedImg != nil {
+		a.transformedImg = nil
+	}
+
 	// Decode base64 string to bytes
 	imageData, err := base64.StdEncoding.DecodeString(imageDataBase64)
 	if err != nil {
@@ -722,10 +736,15 @@ func (a *App) GetTransformedImage() []byte {
 	return a.transformedImg
 }
 
-// ResetPerspective resets perspective transform data
+// ResetPerspective resets perspective transform data and frees memory
 func (a *App) ResetPerspective() {
 	a.cornerPoints = [4][2]float64{}
-	a.transformedImg = nil
+	// Clear transformed image to free memory
+	if a.transformedImg != nil {
+		a.transformedImg = nil
+		// Hint to GC that large allocation can be freed
+		runtime.GC()
+	}
 	a.perspectiveMode = false
 }
 
@@ -861,11 +880,17 @@ func (a *App) ApplyPerspectiveTransformParallel(imageData []byte, dstWidth, dstH
 	// Wait for all goroutines to complete
 	wg.Wait()
 
+	// Clear source image reference to free memory before encoding
+	srcImg = nil
+
 	// Encode result as PNG
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, dstImg); err != nil {
 		return nil, fmt.Errorf("failed to encode transformed image: %w", err)
 	}
+
+	// Hint to GC that large allocations can be freed
+	runtime.GC()
 
 	return buf.Bytes(), nil
 }
@@ -1044,9 +1069,9 @@ func solveLinearSystem(A [][]float64, b []float64) []float64 {
 // ApplyCrop crops an image to the specified rectangle
 // x, y are the top-left coordinates, width and height are the dimensions
 // imageData is a base64 encoded string
-func (a *App) ApplyCrop(imageDataBase64 string, x, y, width, height int) ([]byte, error) {
+func (a *App) ApplyCrop(imageDataBase64 string, x, y, cropWidth, cropHeight int) ([]byte, error) {
 	// Log received data info
-	fmt.Printf("ApplyCrop received base64 string length: %d, crop region: (%d,%d,%d,%d)\n", len(imageDataBase64), x, y, width, height)
+	fmt.Printf("ApplyCrop received base64 string length: %d, crop region: (%d,%d,%d,%d)\n", len(imageDataBase64), x, y, cropWidth, cropHeight)
 
 	if len(imageDataBase64) < 10 {
 		return nil, fmt.Errorf("image data too small: %d bytes", len(imageDataBase64))
@@ -1085,7 +1110,7 @@ func (a *App) ApplyCrop(imageDataBase64 string, x, y, width, height int) ([]byte
 	srcWidth := srcBounds.Dx()
 	srcHeight := srcBounds.Dy()
 	fmt.Printf("Source image bounds: %v, size: %dx%d\n", srcBounds, srcWidth, srcHeight)
-	fmt.Printf("Requested crop: x=%d, y=%d, width=%d, height=%d\n", x, y, width, height)
+	fmt.Printf("Requested crop: x=%d, y=%d, width=%d, height=%d\n", x, y, cropWidth, cropHeight)
 
 	// Validate crop bounds
 	if x < 0 {
@@ -1096,37 +1121,40 @@ func (a *App) ApplyCrop(imageDataBase64 string, x, y, width, height int) ([]byte
 		fmt.Printf("Adjusting y from %d to 0\n", y)
 		y = 0
 	}
-	if x+width > srcWidth {
-		oldWidth := width
-		width = srcWidth - x
-		fmt.Printf("Adjusting width from %d to %d (x=%d, srcWidth=%d)\n", oldWidth, width, x, srcWidth)
+	if x+cropWidth > srcWidth {
+		oldWidth := cropWidth
+		cropWidth = srcWidth - x
+		fmt.Printf("Adjusting width from %d to %d (x=%d, srcWidth=%d)\n", oldWidth, cropWidth, x, srcWidth)
 	}
-	if y+height > srcHeight {
-		oldHeight := height
-		height = srcHeight - y
-		fmt.Printf("Adjusting height from %d to %d (y=%d, srcHeight=%d)\n", oldHeight, height, y, srcHeight)
+	if y+cropHeight > srcHeight {
+		oldHeight := cropHeight
+		cropHeight = srcHeight - y
+		fmt.Printf("Adjusting height from %d to %d (y=%d, srcHeight=%d)\n", oldHeight, cropHeight, y, srcHeight)
 	}
 
 	// Ensure valid dimensions
-	if width <= 0 || height <= 0 {
-		fmt.Printf("ERROR: Invalid crop dimensions after adjustment: width=%d, height=%d\n", width, height)
-		return nil, fmt.Errorf("invalid crop dimensions: width=%d, height=%d", width, height)
+	if cropWidth <= 0 || cropHeight <= 0 {
+		fmt.Printf("ERROR: Invalid crop dimensions after adjustment: width=%d, height=%d\n", cropWidth, cropHeight)
+		return nil, fmt.Errorf("invalid crop dimensions: width=%d, height=%d", cropWidth, cropHeight)
 	}
 
-	fmt.Printf("Final crop dimensions: %dx%d at (%d,%d)\n", width, height, x, y)
+	fmt.Printf("Final crop dimensions: %dx%d at (%d,%d)\n", cropWidth, cropHeight, x, y)
 
 	// Create destination image
-	dstImg := image.NewRGBA(image.Rect(0, 0, width, height))
+	dstImg := image.NewRGBA(image.Rect(0, 0, cropWidth, cropHeight))
 
 	// Copy pixels from source to destination
-	for dstY := 0; dstY < height; dstY++ {
-		for dstX := 0; dstX < width; dstX++ {
+	for dstY := 0; dstY < cropHeight; dstY++ {
+		for dstX := 0; dstX < cropWidth; dstX++ {
 			srcX := x + dstX
 			srcY := y + dstY
 			c := srcImg.At(srcBounds.Min.X+srcX, srcBounds.Min.Y+srcY)
 			dstImg.Set(dstX, dstY, c)
 		}
 	}
+
+	// Clear source image reference to free memory before encoding
+	srcImg = nil
 
 	// Encode result as PNG
 	var buf bytes.Buffer
@@ -1137,6 +1165,10 @@ func (a *App) ApplyCrop(imageDataBase64 string, x, y, width, height int) ([]byte
 
 	result := buf.Bytes()
 	fmt.Printf("Successfully encoded PNG, result size: %d bytes\n", len(result))
+
+	// Hint to GC that large allocations can be freed
+	runtime.GC()
+
 	return result, nil
 }
 

@@ -180,6 +180,9 @@ gridToggle.addEventListener('click', () => {
 fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
+        // Clean up previous image data before loading new one
+        cleanupImageData();
+        
         const reader = new FileReader();
         reader.onload = (event) => {
             // Show crop preview modal instead of immediately loading the image
@@ -540,7 +543,56 @@ async function resetAll() {
     yMaxInput.value = '';
     readingsOutput.textContent = '';
     description.textContent = 'Input y axis, hit enter, and click the top of the graph';
+    
+    // Clean up image data to free memory
+    cleanupImageData();
+    
     resetView();
+}
+
+// Cleanup image data and canvases to free memory
+function cleanupImageData() {
+    // Clear image blob and data URLs
+    if (appState.originalImageBlob) {
+        // Revoke object URL if it was created from a blob
+        try {
+            URL.revokeObjectURL(appState.originalImageBlob);
+        } catch (e) {
+            // Not a blob URL, ignore
+        }
+        appState.originalImageBlob = null;
+    }
+    
+    if (appState.originalImageData) {
+        appState.originalImageData = null;
+    }
+    
+    // Clear raw image dimensions
+    appState.rawImageWidth = null;
+    appState.rawImageHeight = null;
+    
+    // Remove perspective preview canvas completely
+    const previewCanvas = document.getElementById('perspectivePreviewCanvas');
+    if (previewCanvas && previewCanvas.parentNode) {
+        previewCanvas.parentNode.removeChild(previewCanvas);
+    }
+    
+    // Reset perspective mode state
+    appState.perspectiveMode = false;
+    appState.cornerPoints = [
+        { x: 0.1, y: 0.1 },
+        { x: 0.9, y: 0.1 },
+        { x: 0.9, y: 0.9 },
+        { x: 0.1, y: 0.9 }
+    ];
+    
+    // Clear background image
+    pageBackground.style.backgroundImage = '';
+    
+    // Reset file input to allow reloading same file
+    if (fileInput) {
+        fileInput.value = '';
+    }
 }
 
 // Window resize handling
@@ -1013,6 +1065,10 @@ function applyPerspectivePreview() {
         // Put the rendered data onto the canvas
         dstCtx.putImageData(dstData, 0, 0);
         
+        // Clean up temporary canvas to free memory
+        srcCanvas.width = 0;
+        srcCanvas.height = 0;
+        
         // Hide the original background image while showing preview
         pageBackground.style.opacity = '0';
     };
@@ -1173,14 +1229,14 @@ function resetPerspectivePreview() {
     // Show the original background
     pageBackground.style.opacity = '1';
     
-    // Remove preview canvas
+    // Remove preview canvas from DOM to free memory
     const previewCanvas = document.getElementById('perspectivePreviewCanvas');
-    if (previewCanvas) {
-        previewCanvas.style.display = 'none';
+    if (previewCanvas && previewCanvas.parentNode) {
+        previewCanvas.parentNode.removeChild(previewCanvas);
     }
 }
 
-// Hide perspective preview canvas
+// Hide perspective preview canvas (keeps in DOM but hidden)
 function hidePerspectivePreview() {
     const previewCanvas = document.getElementById('perspectivePreviewCanvas');
     if (previewCanvas) {
