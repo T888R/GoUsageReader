@@ -150,6 +150,11 @@ func (a *App) typeMonthlyValues() {
 	// Mark as pasted to prevent double-triggering
 	a.hasPasted = true
 
+	// Delete the 'v' character that was typed when the hotkey was pressed
+	fmt.Println("[DEBUG] Deleting 'v' character")
+	robotgo.KeyTap("backspace")
+	time.Sleep(10 * time.Millisecond)
+
 	// Type all values with tabs in between
 	values := []string{a.january, a.february, a.march, a.april, a.may, a.june,
 		a.july, a.august, a.september, a.october, a.november, a.december}
