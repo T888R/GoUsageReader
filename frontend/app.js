@@ -14,18 +14,9 @@ if (!window.appState) {
 }
 window.appState = {
     ...window.appState,
-    zoom: 1,
-    panX: 0,
-    panY: 0,
-    rotation: 0,
-    isPanning: false,
-    isRotating: false,
-    startX: 0,
-    startY: 0,
     mode: null, // 'standard' or 'addon'
     isCapturing: false,
     gridEnabled: false,
-    isShiftHeld: false,
     perspectiveMode: false,
     cropMode: false,
     isTogglingCrop: false,
@@ -48,14 +39,13 @@ let appState = window.appState;
 const pageBackground = document.getElementById('pageBackground');
 const gridOverlay = document.getElementById('gridOverlay');
 const fileInput = document.getElementById('fileInput');
-const zoomLevel = document.getElementById('zoomLevel');
+
 const yMaxInput = document.getElementById('yMaxInput');
 const standardBtn = document.getElementById('standardBtn');
 const addonBtn = document.getElementById('addonBtn');
 const importBtn = document.getElementById('importBtn');
 const gridToggle = document.getElementById('gridToggle');
-const zoomInBtn = document.getElementById('zoomIn');
-const zoomOutBtn = document.getElementById('zoomOut');
+
 const description = document.getElementById('description');
 const readingsOutput = document.getElementById('readingsOutput');
 
@@ -197,23 +187,10 @@ let rafId = null;
 function updateTransform() {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
-        const transform = `translate3d(${appState.panX}px, ${appState.panY}px, 0) scale(${appState.zoom}) rotate(${appState.rotation}deg)`;
-        pageBackground.style.webkitTransform = transform;
-        pageBackground.style.transform = transform;
-        
-        // Also apply transform to perspective preview canvas if it exists
-        const previewCanvas = document.getElementById('perspectivePreviewCanvas');
-        if (previewCanvas && appState.perspectiveMode) {
-            previewCanvas.style.webkitTransform = transform;
-            previewCanvas.style.transform = transform;
-        }
-        
-        // Update corner positions to follow the transform
+        // Corner positions are updated separately when needed
         if (appState.perspectiveMode) {
             updateCornerPositions();
         }
-        
-        zoomLevel.textContent = `${Math.round(appState.zoom * 100)}%`;
         // Force repaint to clear artifacts in WebKit
         void pageBackground.offsetHeight;
     });
@@ -221,44 +198,10 @@ function updateTransform() {
 
 // Reset view
 function resetView() {
-    appState.zoom = 1;
-    appState.panX = 0;
-    appState.panY = 0;
-    appState.rotation = 0;
     updateTransform();
 }
 
-// Zoom functions
-function zoomIn() {
-    appState.zoom = Math.min(appState.zoom * 1.2, 5);
-    updateTransform();
-}
 
-function zoomOut() {
-    appState.zoom = Math.max(appState.zoom / 1.2, 0.1);
-    updateTransform();
-}
-
-zoomInBtn.addEventListener('click', zoomIn);
-zoomOutBtn.addEventListener('click', zoomOut);
-
-// Mouse wheel zoom
-document.addEventListener('wheel', (e) => {
-    if (e.target.closest('.container')) return; // Don't zoom when scrolling over the UI container
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.1, Math.min(5, appState.zoom * delta));
-    
-    // Zoom towards mouse pointer
-    const mouseX = e.clientX - window.innerWidth / 2;
-    const mouseY = e.clientY - window.innerHeight / 2;
-    
-    appState.panX = mouseX - (mouseX - appState.panX) * (newZoom / appState.zoom);
-    appState.panY = mouseY - (mouseY - appState.panY) * (newZoom / appState.zoom);
-    appState.zoom = newZoom;
-    
-    updateTransform();
-}, { passive: false });
 
 // Pan with Ctrl + drag or Middle mouse button, Rotate with Shift + drag
 // Capture clicks for usage reading
@@ -271,52 +214,10 @@ document.addEventListener('mousedown', (e) => {
         return;
     }
     
-    // Check if this is a rotate action (Shift key)
-    if (e.shiftKey) {
-        e.preventDefault();
-        appState.isRotating = true;
-        appState.startX = e.clientX;
-        appState.startY = e.clientY;
-        document.body.classList.add('rotating');
-        return;
-    }
-    
-    // Check if this is a pan action (Ctrl key or middle mouse button)
-    if (e.ctrlKey || e.button === 1) {
-        e.preventDefault();
-        appState.isPanning = true;
-        appState.startX = e.clientX - appState.panX;
-        appState.startY = e.clientY - appState.panY;
-        document.body.classList.add('panning');
-        return;
-    }
-    
-    // Otherwise, this is a capture click (only when mode is active)
-    if (appState.mode && e.button === 0 && !e.ctrlKey) { // Left click only, no ctrl
+    // This is a capture click (only when mode is active)
+    if (appState.mode && e.button === 0) { // Left click only
         handleCaptureClick(e);
     }
-});
-
-document.addEventListener('mousemove', (e) => {
-    if (appState.isPanning) {
-        e.preventDefault();
-        appState.panX = e.clientX - appState.startX;
-        appState.panY = e.clientY - appState.startY;
-        updateTransform();
-    } else if (appState.isRotating) {
-        e.preventDefault();
-        // Calculate rotation based on horizontal mouse movement
-        const deltaX = e.clientX - appState.startX;
-        appState.rotation = deltaX * 0.5; // Adjust sensitivity
-        updateTransform();
-    }
-});
-
-document.addEventListener('mouseup', () => {
-    appState.isPanning = false;
-    appState.isRotating = false;
-    document.body.classList.remove('panning');
-    document.body.classList.remove('rotating');
 });
 
 // Handle capture click - sends Y coordinate to backend
@@ -385,45 +286,11 @@ async function handleCaptureClick(e) {
     }
 }
 
-// Keyboard controls for zoom
-let keysPressed = {};
-
+// Keyboard controls
 document.addEventListener('keydown', (e) => {
-    if (keysPressed[e.key]) return;
-    keysPressed[e.key] = true;
-    
-    // Track Shift key state
-    if (e.key === 'Shift') {
-        appState.isShiftHeld = true;
-        document.body.classList.add('shift-held');
-    }
-    
-    if (e.key === '+' || e.key === '=') {
-        e.preventDefault();
-        zoomIn();
-    } else if (e.key === '-') {
-        e.preventDefault();
-        zoomOut();
-    } else if (e.key === '0' && e.ctrlKey) {
+    if (e.key === '0' && e.ctrlKey) {
         e.preventDefault();
         resetView();
-    }
-});
-
-document.addEventListener('keyup', (e) => {
-    keysPressed[e.key] = false;
-    
-    // Track Shift key release
-    if (e.key === 'Shift') {
-        appState.isShiftHeld = false;
-        document.body.classList.remove('shift-held');
-    }
-});
-
-// Disable context menu on middle click for panning
-document.addEventListener('contextmenu', (e) => {
-    if (e.button === 1) {
-        e.preventDefault();
     }
 });
 
@@ -501,7 +368,7 @@ async function updateAddonDescription() {
 if (window.runtime && window.runtime.EventsOn) {
     window.runtime.EventsOn('auto-paste', (data) => {
         // Show notification that Alt+V hotkey is ready
-        showNotification('Data ready! Press Alt+V in your browser to paste values.');
+        showNotification('Press v with January selected to paste');
     });
 }
 
@@ -517,7 +384,7 @@ function showNotification(message) {
         padding: 15px 20px;
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 1000;
+        z-index: 11000;
         font-weight: 500;
         max-width: 300px;
     `;
@@ -717,7 +584,7 @@ function disablePerspectiveMode() {
     }
 }
 
-// Get the actual displayed image bounds (accounting for contain and zoom)
+// Get the actual displayed image bounds
 function getImageBounds() {
     const dialogWidth = 360; // Match CSS var(--dialog-width)
     const leftPadding = 40; // Match CSS var(--left-padding)
@@ -749,13 +616,9 @@ function getImageBounds() {
         displayWidth = windowHeight * imgRatio;
     }
     
-    // Apply zoom
-    displayWidth *= appState.zoom;
-    displayHeight *= appState.zoom;
-    
-    // Calculate center position with pan offset
-    const centerX = leftPadding + windowWidth / 2 + appState.panX;
-    const centerY = windowHeight / 2 + appState.panY;
+    // Calculate center position
+    const centerX = leftPadding + windowWidth / 2;
+    const centerY = windowHeight / 2;
     
     // Calculate actual image bounds
     const bounds = {
@@ -848,8 +711,8 @@ function startDraggingCorner(e, cornerIndex) {
         }
         
         const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const leftPadding = 40; // Match CSS var(--left-padding)
-    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
+        const leftPadding = 40; // Match CSS var(--left-padding)
+        const windowWidth = window.innerWidth - dialogWidth - leftPadding;
         const windowHeight = window.innerHeight;
         const imgWidth = appState.rawImageWidth;
         const imgHeight = appState.rawImageHeight;
@@ -867,34 +730,21 @@ function startDraggingCorner(e, cornerIndex) {
             displayWidth = windowHeight * imgRatio;
         }
         
-        // Apply zoom
-        const zoom = appState.zoom;
-        displayWidth *= zoom;
-        displayHeight *= zoom;
-        
-        // Calculate center position with pan offset
-        const centerX = leftPadding + windowWidth / 2 + appState.panX;
-        const centerY = windowHeight / 2 + appState.panY;
+        // Calculate center position
+        const centerX = leftPadding + windowWidth / 2;
+        const centerY = windowHeight / 2;
         
         // Get mouse position
         const mouseX = e.clientX;
         const mouseY = e.clientY;
         
-        // Inverse transform: subtract center, unrotate, unscale
+        // Convert to normalized coordinates relative to image center
         const dx = mouseX - centerX;
         const dy = mouseY - centerY;
         
-        // Apply inverse rotation
-        const rotationRad = (-appState.rotation * Math.PI) / 180;
-        const cos = Math.cos(rotationRad);
-        const sin = Math.sin(rotationRad);
-        
-        const unrotatedX = dx * cos - dy * sin;
-        const unrotatedY = dx * sin + dy * cos;
-        
-        // Unscale (divide by half display size to get normalized -1 to 1)
-        const normX = unrotatedX / (displayWidth / 2);
-        const normY = unrotatedY / (displayHeight / 2);
+        // Normalize (divide by half display size to get -1 to 1)
+        const normX = dx / (displayWidth / 2);
+        const normY = dy / (displayHeight / 2);
         
         // Convert normalized (-1 to 1) back to raw pixel coordinates
         const rawX = (normX / 2 + 0.5) * imgWidth;
@@ -908,7 +758,6 @@ function startDraggingCorner(e, cornerIndex) {
         
         // Only update UI elements during drag (lightweight)
         updateCornerPositions();
-        // applyPerspectivePreview() is now only called on mouseup for performance
     };
     
     const onMouseUp = () => {
@@ -1273,20 +1122,9 @@ function updateCornerPositions() {
         displayWidth = windowHeight * imgRatio;
     }
     
-    // Apply zoom
-    const zoom = appState.zoom;
-    displayWidth *= zoom;
-    displayHeight *= zoom;
-    
-    // Calculate center position with pan offset
-    const centerX = leftPadding + windowWidth / 2 + appState.panX;
-    const centerY = windowHeight / 2 + appState.panY;
-    
-    // For CSS transforms, the order is: translate -> scale -> rotate
-    // All scaling and rotation happen around the center (transform-origin: center center)
-    const rotationRad = (appState.rotation * Math.PI) / 180;
-    const cos = Math.cos(rotationRad);
-    const sin = Math.sin(rotationRad);
+    // Calculate center position
+    const centerX = leftPadding + windowWidth / 2;
+    const centerY = windowHeight / 2;
     
     cornerHandles.forEach((handle, index) => {
         const point = appState.cornerPoints[index];
@@ -1299,14 +1137,10 @@ function updateCornerPositions() {
         const scaledX = normX * displayWidth / 2;
         const scaledY = normY * displayHeight / 2;
         
-        // Apply rotation around center
-        const rotatedX = scaledX * cos - scaledY * sin;
-        const rotatedY = scaledX * sin + scaledY * cos;
-        
-        // Add center position (includes pan)
+        // Add center position
         // Subtract leftPadding because the perspectiveControls container already has margin-left
-        const screenX = centerX + rotatedX - leftPadding;
-        const screenY = centerY + rotatedY;
+        const screenX = centerX + scaledX - leftPadding;
+        const screenY = centerY + scaledY;
         
         handle.style.left = `${screenX}px`;
         handle.style.top = `${screenY}px`;
@@ -1348,19 +1182,9 @@ function drawPerspectiveLines() {
         displayWidth = windowHeight * imgRatio;
     }
     
-    // Apply zoom
-    const zoom = appState.zoom;
-    displayWidth *= zoom;
-    displayHeight *= zoom;
-    
-    // Calculate center position with pan offset
-    const centerX = leftPadding + windowWidth / 2 + appState.panX;
-    const centerY = windowHeight / 2 + appState.panY;
-    
-    // For CSS transforms, the order is: translate -> scale -> rotate
-    const rotationRad = (appState.rotation * Math.PI) / 180;
-    const cos = Math.cos(rotationRad);
-    const sin = Math.sin(rotationRad);
+    // Calculate center position
+    const centerX = leftPadding + windowWidth / 2;
+    const centerY = windowHeight / 2;
     
     // Helper function to convert raw image point to screen coordinates
     const getScreenPoint = (point) => {
@@ -1372,15 +1196,11 @@ function drawPerspectiveLines() {
         const scaledX = normX * displayWidth / 2;
         const scaledY = normY * displayHeight / 2;
         
-        // Apply rotation around center
-        const rotatedX = scaledX * cos - scaledY * sin;
-        const rotatedY = scaledX * sin + scaledY * cos;
-        
-        // Add center position (includes pan)
+        // Add center position
         // Subtract leftPadding because the perspectiveControls container already has margin-left
         return {
-            x: centerX + rotatedX - leftPadding,
-            y: centerY + rotatedY
+            x: centerX + scaledX - leftPadding,
+            y: centerY + scaledY
         };
     };
     
@@ -1618,7 +1438,7 @@ async function applyPerspectiveTransform() {
             // Disable perspective mode after applying
             disablePerspectiveMode();
             
-            // Reset zoom and pan since image is now aligned
+            // Reset view since image is now aligned
             resetView();
         } else {
             showNotification('Transform failed - no data returned');

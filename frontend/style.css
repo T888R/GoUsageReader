@@ -159,41 +159,7 @@ button {
     transform: translateY(-2px);
 }
 
-.zoom-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--ctp-surface0);
-    padding: 8px 12px;
-    border-radius: 20px;
-}
 
-#zoomOut, #zoomIn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--ctp-surface1);
-    border: 2px solid var(--ctp-surface1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    padding: 0;
-    flex: 0 0 auto;
-}
-
-#zoomOut:hover, #zoomIn:hover {
-    background: var(--ctp-lavender);
-    color: var(--ctp-base);
-    border-color: var(--ctp-lavender);
-}
-
-#zoomLevel {
-    font-weight: 600;
-    color: var(--ctp-text);
-    min-width: 50px;
-    text-align: center;
-}
 
 .status {
     background: var(--ctp-mantle);
@@ -280,17 +246,7 @@ button {
     background: var(--ctp-teal);
 }
 
-body.panning {
-    cursor: grabbing;
-}
 
-body.rotating {
-    cursor: grab;
-}
-
-body.shift-held #pageBackground {
-    cursor: grab;
-}
 
 /* Active mode indicators */
 .mode-active {
