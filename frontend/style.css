@@ -120,7 +120,7 @@ button {
 
 #standardBtn {
     background: linear-gradient(135deg, var(--ctp-lavender) 0%, var(--ctp-blue) 100%);
-    color: white;
+    color: var(--ctp-base);
 }
 
 #standardBtn:hover {
@@ -130,7 +130,7 @@ button {
 
 #addonBtn {
     background: linear-gradient(135deg, var(--ctp-pink) 0%, var(--ctp-mauve) 100%);
-    color: white;
+    color: var(--ctp-base);
 }
 
 #addonBtn:hover {
@@ -148,7 +148,7 @@ button {
 
 #importBtn {
     background: var(--ctp-green);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     flex: 0 0 auto;
     font-size: 0.85rem;
@@ -184,7 +184,7 @@ button {
 
 #zoomOut:hover, #zoomIn:hover {
     background: var(--ctp-lavender);
-    color: white;
+    color: var(--ctp-base);
     border-color: var(--ctp-lavender);
 }
 
@@ -265,7 +265,7 @@ button {
 
 #gridToggle {
     background: var(--ctp-overlay1);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     flex: 0 0 auto;
     font-size: 0.85rem;
@@ -307,7 +307,7 @@ body.shift-held #pageBackground {
 
 #perspectiveToggle {
     background: var(--ctp-overlay1);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     font-size: 0.85rem;
     flex: 1;
@@ -324,7 +324,7 @@ body.shift-held #pageBackground {
 
 #applyPerspective {
     background: var(--ctp-green);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     font-size: 0.85rem;
     flex: 1;
@@ -337,7 +337,7 @@ body.shift-held #pageBackground {
 
 #resetPerspective {
     background: var(--ctp-red);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     font-size: 0.85rem;
     flex: 1;
@@ -435,7 +435,7 @@ body.shift-held #pageBackground {
 
 #cropToggle {
     background: var(--ctp-overlay1);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     font-size: 0.85rem;
     flex: 1;
@@ -452,7 +452,7 @@ body.shift-held #pageBackground {
 
 #applyCrop {
     background: var(--ctp-green);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     font-size: 0.85rem;
     flex: 1;
@@ -465,7 +465,7 @@ body.shift-held #pageBackground {
 
 #cancelCrop {
     background: var(--ctp-red);
-    color: white;
+    color: var(--ctp-base);
     padding: 8px 16px;
     font-size: 0.85rem;
     flex: 1;
@@ -619,7 +619,7 @@ body.crop-mode {
 
 #cropPreviewApply {
     background: linear-gradient(135deg, var(--ctp-lavender) 0%, var(--ctp-blue) 100%);
-    color: white;
+    color: var(--ctp-base);
 }
 
 #cropPreviewApply:hover {
@@ -636,7 +636,7 @@ body.crop-mode {
 
 #cropPreviewSkip {
     background: var(--ctp-surface0);
-    color: var(--ctp-subtext1);
+    color: var(--ctp-base);
     border: 2px solid var(--ctp-surface1);
 }
 
