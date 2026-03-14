@@ -172,9 +172,14 @@ gridToggle.addEventListener('click', () => {
     gridToggle.classList.toggle('active', appState.gridEnabled);
 });
 
-fileInput.addEventListener('change', (e) => {
+fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (file) {
+        // If we're in the middle of usage input, reset the state
+        if (appState.mode) {
+            await resetUsageState();
+        }
+        
         // Clean up previous image data before loading new one
         cleanupImageData();
         
@@ -419,11 +424,24 @@ async function resetAll() {
     yMaxInput.value = '';
     readingsOutput.textContent = '';
     description.textContent = 'Input y axis, hit enter, and click the top of the graph';
-    
+
     // Clean up image data to free memory
     cleanupImageData();
-    
+
     resetView();
+}
+
+// Reset usage state when importing an image mid-usage input
+async function resetUsageState() {
+    if (isGoAvailable()) {
+        await callGo("Reset");
+    }
+    appState.mode = null;
+    standardBtn.classList.remove('mode-active');
+    addonBtn.classList.remove('mode-active');
+    document.body.style.cursor = '';
+    readingsOutput.textContent = '';
+    description.textContent = 'Input y axis, hit enter, and click the top of the graph';
 }
 
 // Cleanup image data and canvases to free memory
