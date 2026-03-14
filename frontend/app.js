@@ -150,6 +150,10 @@ function extractReading(result) {
 if (importBtn && fileInput) {
     importBtn.addEventListener('click', () => {
         console.log('Import button clicked, triggering file input');
+        // Turn off perspective mode when importing a new image
+        if (appState.perspectiveMode) {
+            disablePerspectiveMode();
+        }
         fileInput.click();
     });
     console.log('Import button listener attached successfully');
@@ -419,6 +423,25 @@ async function resetAll() {
 
 // Cleanup image data and canvases to free memory
 function cleanupImageData() {
+    // Disable crop mode to reset all crop-related state
+    if (appState.cropMode) {
+        disableCropMode();
+    }
+    
+    // Clear crop selection state
+    appState.cropSelection = null;
+    appState.isDrawingCrop = false;
+    appState.cropStart = null;
+    clearCropSelection();
+    
+    // Clear crop preview modal state if it exists
+    if (typeof cropPreviewSelectionData !== 'undefined') {
+        cropPreviewSelectionData = null;
+    }
+    if (typeof clearCropPreviewSelection === 'function') {
+        clearCropPreviewSelection();
+    }
+    
     // Clear image blob and data URLs
     if (appState.originalImageBlob) {
         // Revoke object URL if it was created from a blob
@@ -452,6 +475,28 @@ function cleanupImageData() {
         { x: 0.9, y: 0.9 },
         { x: 0.1, y: 0.9 }
     ];
+    
+    // Disable perspective mode in backend and update UI
+    if (isGoAvailable()) {
+        callGo("SetPerspectiveMode", false);
+        callGo("ResetPerspective");
+    }
+    
+    // Update perspective UI to reflect off state
+    if (perspectiveToggle) {
+        perspectiveToggle.textContent = 'Perspective: Off';
+        perspectiveToggle.classList.remove('active');
+    }
+    if (perspectiveControls) {
+        perspectiveControls.style.display = 'none';
+        perspectiveControls.classList.remove('active');
+    }
+    if (applyPerspectiveBtn) {
+        applyPerspectiveBtn.style.display = 'none';
+    }
+    if (resetPerspectiveBtn) {
+        resetPerspectiveBtn.style.display = 'none';
+    }
     
     // Clear background image
     pageBackground.style.backgroundImage = '';
