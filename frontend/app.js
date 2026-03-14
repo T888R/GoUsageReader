@@ -308,35 +308,40 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Y Max input handling
-yMaxInput.addEventListener('keypress', (e) => {
+// Y Max input handling - triggers standard workflow on Enter release
+yMaxInput.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') {
         const value = parseInt(yMaxInput.value);
         if (value > 0) {
-            if (isGoAvailable()) {
-                callGo("SetYMax", value);
-            }
+            startStandardWorkflow(value);
+        } else {
+            alert('Please enter a valid Y axis maximum value');
         }
     }
 });
+
+// Start the standard usage workflow
+async function startStandardWorkflow(value) {
+    appState.mode = 'standard';
+    standardBtn.classList.add('mode-active');
+    addonBtn.classList.remove('mode-active');
+    document.body.style.cursor = 'crosshair';
+    
+    if (isGoAvailable()) {
+        await callGo("SetYMax", value);
+        await callGo("StartRegularUsage");
+        await callGo("SetWindowHeight", window.innerHeight);
+        await updateDescription();
+    }
+    readingsOutput.textContent = '';
+    description.textContent = 'Click the top of the graph';
+}
 
 // Mode selection
 standardBtn.addEventListener('click', async () => {
     const value = parseInt(yMaxInput.value);
     if (value > 0) {
-        appState.mode = 'standard';
-        standardBtn.classList.add('mode-active');
-        addonBtn.classList.remove('mode-active');
-        document.body.style.cursor = 'crosshair';
-        
-        if (isGoAvailable()) {
-            await callGo("SetYMax", value);
-            await callGo("StartRegularUsage");
-            await callGo("SetWindowHeight", window.innerHeight);
-            await updateDescription();
-        }
-        readingsOutput.textContent = '';
-        description.textContent = 'Click the top of the graph';
+        await startStandardWorkflow(value);
     } else {
         alert('Please enter a valid Y axis maximum value');
     }
