@@ -207,7 +207,7 @@ button {
     z-index: -1;
     background-color: var(--ctp-crust);
     background-size: contain;
-    background-position: center top;
+    background-position: center center;
     background-repeat: no-repeat;
     transform-origin: center center;
     will-change: transform;
