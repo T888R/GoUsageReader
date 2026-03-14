@@ -29,7 +29,8 @@ window.appState = {
     isDraggingCorner: false,
     draggedCorner: null,
     originalImageData: null,
-    originalImageBlob: null // Store the actual blob data for transforms
+    originalImageBlob: null, // Store the actual blob data for transforms
+    rotationAngle: 0 // Current rotation angle in degrees (0, 90, 180, 270)
 };
 
 // Create local reference
@@ -179,12 +180,16 @@ fileInput.addEventListener('change', (e) => {
         
         const reader = new FileReader();
         reader.onload = (event) => {
-            // Show crop preview modal instead of immediately loading the image
+            // Reset rotation when importing a new image
+            appState.rotationAngle = 0;
+            // Show crop preview modal which will normalize image orientation
             showCropPreviewModal(event.target.result);
         };
         reader.readAsDataURL(file);
     }
 });
+
+
 
 // Update transform
 let rafId = null;
@@ -476,6 +481,9 @@ function cleanupImageData() {
         { x: 0.1, y: 0.9 }
     ];
     
+    // Reset rotation
+    appState.rotationAngle = 0;
+    
     // Disable perspective mode in backend and update UI
     if (isGoAvailable()) {
         callGo("SetPerspectiveMode", false);
@@ -633,8 +641,9 @@ function disablePerspectiveMode() {
 function getImageBounds() {
     const dialogWidth = 360; // Match CSS var(--dialog-width)
     const leftPadding = 40; // Match CSS var(--left-padding)
+    const topPadding = 20; // Top padding for image area
     const windowWidth = window.innerWidth - dialogWidth - leftPadding;
-    const windowHeight = window.innerHeight;
+    const windowHeight = window.innerHeight - 40; // Subtract top and bottom padding (20px each)
     
     // Check if we have raw image dimensions stored
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
@@ -661,9 +670,9 @@ function getImageBounds() {
         displayWidth = windowHeight * imgRatio;
     }
     
-    // Calculate center position
+    // Calculate center position with top padding offset
     const centerX = leftPadding + windowWidth / 2;
-    const centerY = windowHeight / 2;
+    const centerY = topPadding + windowHeight / 2;
     
     // Calculate actual image bounds
     const bounds = {
@@ -694,47 +703,6 @@ function resetCornersToImageBounds() {
     ];
 }
 
-// Draw lines connecting the corners
-function drawPerspectiveLines() {
-    const linesContainer = document.getElementById('perspectiveLines');
-    linesContainer.innerHTML = '';
-    
-    if (!appState.perspectiveMode) return;
-    
-    const dialogWidth = 360; // Match CSS var(--dialog-width)
-    const leftPadding = 40; // Match CSS var(--left-padding)
-    const windowWidth = window.innerWidth - dialogWidth - leftPadding;
-    const windowHeight = window.innerHeight;
-    
-    // Define line pairs (connections)
-    const connections = [
-        [0, 1], [1, 2], [2, 3], [3, 0] // Rectangle edges
-    ];
-    
-    connections.forEach(([start, end]) => {
-        const p1 = appState.cornerPoints[start];
-        const p2 = appState.cornerPoints[end];
-        
-        // Get handle center positions
-        const x1 = p1.x * windowWidth;
-        const y1 = p1.y * windowHeight;
-        const x2 = p2.x * windowWidth;
-        const y2 = p2.y * windowHeight;
-        
-        const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-        
-        const line = document.createElement('div');
-        line.className = 'perspective-line';
-        line.style.width = `${length}px`;
-        line.style.left = `${x1}px`;
-        line.style.top = `${y1}px`;
-        line.style.transform = `rotate(${angle}deg)`;
-        
-        linesContainer.appendChild(line);
-    });
-}
-
 // Start dragging a corner handle
 function startDraggingCorner(e, cornerIndex) {
     if (!appState.perspectiveMode) return;
@@ -757,8 +725,9 @@ function startDraggingCorner(e, cornerIndex) {
         
         const dialogWidth = 360; // Match CSS var(--dialog-width)
         const leftPadding = 40; // Match CSS var(--left-padding)
+        const topPadding = 20; // Top padding for image area
         const windowWidth = window.innerWidth - dialogWidth - leftPadding;
-        const windowHeight = window.innerHeight;
+        const windowHeight = window.innerHeight - 40; // Subtract top and bottom padding (20px each)
         const imgWidth = appState.rawImageWidth;
         const imgHeight = appState.rawImageHeight;
         
@@ -775,9 +744,9 @@ function startDraggingCorner(e, cornerIndex) {
             displayWidth = windowHeight * imgRatio;
         }
         
-        // Calculate center position
+        // Calculate center position with top padding offset
         const centerX = leftPadding + windowWidth / 2;
-        const centerY = windowHeight / 2;
+        const centerY = topPadding + windowHeight / 2;
         
         // Get mouse position
         const mouseX = e.clientX;
@@ -1149,8 +1118,9 @@ function updateCornerPositions() {
     
     const dialogWidth = 360; // Match CSS var(--dialog-width)
     const leftPadding = 40; // Match CSS var(--left-padding)
+    const topPadding = 20; // Top padding for image area
     const windowWidth = window.innerWidth - dialogWidth - leftPadding;
-    const windowHeight = window.innerHeight;
+    const windowHeight = window.innerHeight - 40; // Subtract top and bottom padding (20px each)
     const imgWidth = appState.rawImageWidth;
     const imgHeight = appState.rawImageHeight;
     
@@ -1167,9 +1137,9 @@ function updateCornerPositions() {
         displayWidth = windowHeight * imgRatio;
     }
     
-    // Calculate center position
+    // Calculate center position with top padding offset
     const centerX = leftPadding + windowWidth / 2;
-    const centerY = windowHeight / 2;
+    const centerY = topPadding + windowHeight / 2;
     
     cornerHandles.forEach((handle, index) => {
         const point = appState.cornerPoints[index];
@@ -1183,9 +1153,9 @@ function updateCornerPositions() {
         const scaledY = normY * displayHeight / 2;
         
         // Add center position
-        // Subtract leftPadding because the perspectiveControls container already has margin-left
+        // Subtract leftPadding and topPadding because the perspectiveControls container already has margins
         const screenX = centerX + scaledX - leftPadding;
-        const screenY = centerY + scaledY;
+        const screenY = centerY + scaledY - topPadding;
         
         handle.style.left = `${screenX}px`;
         handle.style.top = `${screenY}px`;
@@ -1209,8 +1179,9 @@ function drawPerspectiveLines() {
     
     const dialogWidth = 360; // Match CSS var(--dialog-width)
     const leftPadding = 40; // Match CSS var(--left-padding)
+    const topPadding = 20; // Top padding for image area
     const windowWidth = window.innerWidth - dialogWidth - leftPadding;
-    const windowHeight = window.innerHeight;
+    const windowHeight = window.innerHeight - 40; // Subtract top and bottom padding (20px each)
     const imgWidth = appState.rawImageWidth;
     const imgHeight = appState.rawImageHeight;
     
@@ -1227,9 +1198,9 @@ function drawPerspectiveLines() {
         displayWidth = windowHeight * imgRatio;
     }
     
-    // Calculate center position
+    // Calculate center position with top padding offset
     const centerX = leftPadding + windowWidth / 2;
-    const centerY = windowHeight / 2;
+    const centerY = topPadding + windowHeight / 2;
     
     // Helper function to convert raw image point to screen coordinates
     const getScreenPoint = (point) => {
@@ -1242,10 +1213,10 @@ function drawPerspectiveLines() {
         const scaledY = normY * displayHeight / 2;
         
         // Add center position
-        // Subtract leftPadding because the perspectiveControls container already has margin-left
+        // Subtract leftPadding and topPadding because the perspectiveControls container already has margins
         return {
             x: centerX + scaledX - leftPadding,
-            y: centerY + scaledY
+            y: centerY + scaledY - topPadding
         };
     };
     
@@ -2216,6 +2187,10 @@ let cropPreviewModal, cropPreviewImage, cropPreviewSelection, cropPreviewApplyBt
 let cropPreviewSelectionData = null;
 let isDrawingCropPreview = false;
 let cropPreviewStart = null;
+let rotateLeftBtn, rotateRightBtn, rotationIndicator;
+let cropPreviewRotationAngle = 0; // Rotation angle for preview modal
+let cropPreviewOriginalImage = null; // Store original image for efficient rotation
+let rotationCanvas = null; // Reusable canvas for rotation
 
 // Initialize crop preview elements
 function initCropPreviewElements() {
@@ -2224,34 +2199,328 @@ function initCropPreviewElements() {
     cropPreviewSelection = document.getElementById('cropPreviewSelection');
     cropPreviewApplyBtn = document.getElementById('cropPreviewApply');
     cropPreviewSkipBtn = document.getElementById('cropPreviewSkip');
-    
+    rotateLeftBtn = document.getElementById('rotateLeftBtn');
+    rotateRightBtn = document.getElementById('rotateRightBtn');
+    rotationIndicator = document.getElementById('rotationIndicator');
+
     if (cropPreviewApplyBtn) {
         cropPreviewApplyBtn.addEventListener('click', applyCropFromPreview);
     }
-    
+
     if (cropPreviewSkipBtn) {
         cropPreviewSkipBtn.addEventListener('click', skipCropPreview);
     }
+
+    // Rotation button handlers
+    if (rotateLeftBtn) {
+        rotateLeftBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            rotatePreviewImage(-90);
+        });
+    }
+
+    if (rotateRightBtn) {
+        rotateRightBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            rotatePreviewImage(90);
+        });
+    }
+}
+
+// Rotate the preview image by specified degrees - optimized version
+function rotatePreviewImage(degrees) {
+    if (!cropPreviewOriginalImage) return;
+
+    // Prevent multiple rapid rotations
+    if (rotateLeftBtn) rotateLeftBtn.disabled = true;
+    if (rotateRightBtn) rotateRightBtn.disabled = true;
+
+    // Calculate new rotation angle
+    cropPreviewRotationAngle = (cropPreviewRotationAngle + degrees + 360) % 360;
+
+    // Update the rotation indicator
+    if (rotationIndicator) {
+        rotationIndicator.textContent = cropPreviewRotationAngle + '°';
+    }
+
+    // Show loading state
+    cropPreviewImage.style.opacity = '0.5';
+    cropPreviewImage.style.filter = 'blur(2px)';
+
+    // Use requestAnimationFrame to prevent UI blocking
+    requestAnimationFrame(() => {
+        performFastRotation();
+    });
+}
+
+// Perform the actual rotation using optimized canvas operations
+function performFastRotation() {
+    const img = cropPreviewOriginalImage;
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+
+    // Create or reuse canvas
+    if (!rotationCanvas) {
+        rotationCanvas = document.createElement('canvas');
+    }
+
+    const canvas = rotationCanvas;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    // Swap dimensions for 90/270 degree rotations
+    if (cropPreviewRotationAngle === 90 || cropPreviewRotationAngle === 270) {
+        canvas.width = height;
+        canvas.height = width;
+    } else {
+        canvas.width = width;
+        canvas.height = height;
+    }
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Apply rotation transformation
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((cropPreviewRotationAngle * Math.PI) / 180);
+    ctx.drawImage(img, -width / 2, -height / 2);
+    ctx.restore();
+
+    // Convert to data URL with lower quality for speed (0.9 is a good balance)
+    // Use JPEG for better performance unless we need transparency
+    const rotatedUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+    // Create a new image to preload before updating display
+    const preloader = new Image();
+    preloader.onload = () => {
+        // Update the preview image source
+        cropPreviewImage.src = rotatedUrl;
+
+        // Restore opacity
+        cropPreviewImage.style.opacity = '1';
+        cropPreviewImage.style.filter = 'none';
+
+        // Re-enable rotation buttons
+        if (rotateLeftBtn) rotateLeftBtn.disabled = false;
+        if (rotateRightBtn) rotateRightBtn.disabled = false;
+
+        // Clear any existing selection since the image rotated
+        clearCropPreviewSelection();
+    };
+    preloader.onerror = () => {
+        // Re-enable buttons even on error
+        if (rotateLeftBtn) rotateLeftBtn.disabled = false;
+        if (rotateRightBtn) rotateRightBtn.disabled = false;
+        cropPreviewImage.style.opacity = '1';
+        cropPreviewImage.style.filter = 'none';
+    };
+    preloader.src = rotatedUrl;
+}
+
+// Read Exif orientation from image data - optimized version
+async function getExifOrientation(imageDataUrl) {
+    return new Promise((resolve) => {
+        // Only process JPEG images
+        if (!imageDataUrl.startsWith('data:image/jpeg')) {
+            resolve(1); // Default orientation for non-JPEG
+            return;
+        }
+
+        // Extract base64 data and decode
+        try {
+            const base64Data = imageDataUrl.split(',')[1];
+            const binaryString = atob(base64Data);
+
+            // Only read first 64KB which should contain all Exif data
+            const maxBytes = Math.min(binaryString.length, 65536);
+            const bytes = new Uint8Array(maxBytes);
+
+            for (let i = 0; i < maxBytes; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            const view = new DataView(bytes.buffer);
+
+            // Check for JPEG magic number
+            if (view.getUint16(0, false) !== 0xFFD8) {
+                resolve(1);
+                return;
+            }
+
+            let offset = 2;
+            while (offset < bytes.length - 4) {
+                const marker = view.getUint16(offset, false);
+
+                // APP1 marker (Exif)
+                if (marker === 0xFFE1) {
+                    if (offset + 8 > bytes.length) break;
+
+                    const segmentLength = view.getUint16(offset + 2, false);
+                    const exifOffset = offset + 4;
+
+                    // Check for Exif header
+                    if (exifOffset + 6 > bytes.length) break;
+
+                    const exifHeader = String.fromCharCode(
+                        bytes[exifOffset],
+                        bytes[exifOffset + 1],
+                        bytes[exifOffset + 2],
+                        bytes[exifOffset + 3]
+                    );
+
+                    if (exifHeader === 'Exif') {
+                        const tiffOffset = exifOffset + 6;
+                        if (tiffOffset + 8 > bytes.length) break;
+
+                        const isLittleEndian = view.getUint16(tiffOffset, false) === 0x4949;
+                        const ifdOffset = view.getUint32(tiffOffset + 4, isLittleEndian);
+
+                        if (tiffOffset + ifdOffset + 2 > bytes.length) break;
+
+                        const numEntries = view.getUint16(tiffOffset + ifdOffset, isLittleEndian);
+
+                        // Search for orientation tag (0x0112)
+                        for (let i = 0; i < numEntries && i < 20; i++) {
+                            const entryOffset = tiffOffset + ifdOffset + 2 + (i * 12);
+                            if (entryOffset + 10 > bytes.length) break;
+
+                            const tag = view.getUint16(entryOffset, isLittleEndian);
+
+                            if (tag === 0x0112) {
+                                const orientation = view.getUint16(entryOffset + 8, isLittleEndian);
+                                resolve(orientation);
+                                return;
+                            }
+                        }
+                    }
+
+                    offset += 2 + segmentLength;
+                } else if ((marker & 0xFF00) !== 0xFF00 || marker === 0xFFD9 || marker === 0xFFDA) {
+                    // Invalid marker or end of image
+                    break;
+                } else {
+                    // Skip other segments
+                    if (offset + 4 > bytes.length) break;
+                    const segmentLength = view.getUint16(offset + 2, false);
+                    offset += 2 + segmentLength;
+                }
+            }
+
+            resolve(1); // Default orientation
+        } catch (e) {
+            resolve(1); // Default on error
+        }
+    });
+}
+
+// Normalize image orientation by drawing to canvas
+async function normalizeImageOrientation(imageDataUrl) {
+    const orientation = await getExifOrientation(imageDataUrl);
+    
+    if (orientation === 1) {
+        // No transformation needed
+        return imageDataUrl;
+    }
+    
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas dimensions based on orientation
+            if (orientation >= 5) {
+                // 90 or 270 degree rotation - swap dimensions
+                canvas.width = img.naturalHeight;
+                canvas.height = img.naturalWidth;
+            } else {
+                // 0 or 180 degree rotation - keep dimensions
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+            }
+            
+            // Apply transformations based on orientation
+            ctx.save();
+            
+            switch (orientation) {
+                case 2: // Flip horizontal
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    break;
+                case 3: // Rotate 180
+                    ctx.translate(canvas.width, canvas.height);
+                    ctx.rotate(Math.PI);
+                    break;
+                case 4: // Flip vertical
+                    ctx.translate(0, canvas.height);
+                    ctx.scale(1, -1);
+                    break;
+                case 5: // Flip horizontal then rotate 90 CW
+                    ctx.translate(canvas.width, 0);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.scale(-1, 1);
+                    break;
+                case 6: // Rotate 90 CW
+                    ctx.translate(canvas.width, 0);
+                    ctx.rotate(Math.PI / 2);
+                    break;
+                case 7: // Flip horizontal then rotate 90 CCW
+                    ctx.translate(0, canvas.height);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.scale(-1, 1);
+                    break;
+                case 8: // Rotate 90 CCW
+                    ctx.translate(0, canvas.height);
+                    ctx.rotate(-Math.PI / 2);
+                    break;
+            }
+            
+            ctx.drawImage(img, 0, 0);
+            ctx.restore();
+
+            // Convert back to data URL using JPEG for better performance
+            // JPEG is much faster than PNG and we don't need transparency
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
+        };
+        img.src = imageDataUrl;
+    });
 }
 
 // Show crop preview modal
-function showCropPreviewModal(imageDataUrl) {
+async function showCropPreviewModal(imageDataUrl) {
     if (!cropPreviewModal) {
         initCropPreviewElements();
     }
-    
-    // Set the preview image
-    cropPreviewImage.src = imageDataUrl;
-    
+
+    // Normalize image orientation first
+    showNotification('Processing image...');
+    const normalizedImageUrl = await normalizeImageOrientation(imageDataUrl);
+
+    // Load the normalized image and store it for efficient rotation
+    cropPreviewOriginalImage = new Image();
+    cropPreviewOriginalImage.onload = () => {
+        // Set the preview image
+        cropPreviewImage.src = normalizedImageUrl;
+    };
+    cropPreviewOriginalImage.src = normalizedImageUrl;
+
+    // Reset rotation
+    cropPreviewRotationAngle = 0;
+    if (rotationIndicator) {
+        rotationIndicator.textContent = '0°';
+    }
+
     // Reset selection
     cropPreviewSelectionData = null;
     cropPreviewSelection.style.display = 'none';
     cropPreviewSelection.classList.remove('active');
-    
+
     // Disable apply button until selection is made
     cropPreviewApplyBtn.disabled = true;
     cropPreviewApplyBtn.textContent = 'Apply Crop';
-    
+
     // Show modal
     cropPreviewModal.style.display = 'flex';
     
@@ -2434,15 +2703,18 @@ async function applyCropFromPreview() {
                 // Set the image
                 pageBackground.style.backgroundImage = `url(${croppedUrl})`;
                 document.body.style.background = 'none';
-                
+
                 // Store original image data
                 appState.originalImageBlob = croppedUrl;
                 appState.originalImageData = pageBackground.style.backgroundImage;
-                
+
                 // Update dimensions
                 appState.rawImageWidth = croppedImg.naturalWidth;
                 appState.rawImageHeight = croppedImg.naturalHeight;
-                
+
+                // Store the rotation angle for reference
+                appState.rotationAngle = cropPreviewRotationAngle;
+
                 // Reset view
                 resetView();
                 
@@ -2468,28 +2740,35 @@ async function applyCropFromPreview() {
 // Skip crop and use full image
 function skipCropPreview() {
     const imageDataUrl = cropPreviewImage.src;
-    
+
     // Load the full image
     const img = new Image();
     img.onload = () => {
         pageBackground.style.backgroundImage = `url(${imageDataUrl})`;
         document.body.style.background = 'none';
-        
+
         // Store original image data
         appState.originalImageBlob = imageDataUrl;
         appState.originalImageData = pageBackground.style.backgroundImage;
-        
-        // Update dimensions
+
+        // Update dimensions - account for rotation
         appState.rawImageWidth = img.naturalWidth;
         appState.rawImageHeight = img.naturalHeight;
-        
+
+        // Store the rotation angle for reference
+        appState.rotationAngle = cropPreviewRotationAngle;
+
         // Reset view
         resetView();
-        
+
         // Close modal
         hideCropPreviewModal();
-        
+
         showNotification('Image imported successfully. You can now use perspective transform.');
+    };
+    img.onerror = (err) => {
+        console.error('Failed to load image:', err);
+        showNotification('Error loading image');
     };
     img.src = imageDataUrl;
 }
@@ -2499,7 +2778,15 @@ function hideCropPreviewModal() {
     cropPreviewModal.style.display = 'none';
     cropPreviewImage.src = '';
     clearCropPreviewSelection();
-    
+
+    // Clean up stored image and canvas to free memory
+    cropPreviewOriginalImage = null;
+    if (rotationCanvas) {
+        rotationCanvas.width = 0;
+        rotationCanvas.height = 0;
+        rotationCanvas = null;
+    }
+
     // Remove event listeners
     const container = document.querySelector('.crop-preview-container');
     if (container) {

@@ -246,7 +246,7 @@ func (a *App) GetDescription() string {
 	case 13:
 		return "Click December"
 	default:
-		return "Usage calculation completed. Press Alt+V with January field selected to paste"
+		return "Usage calculation completed. Press V with January field selected to paste"
 	}
 }
 
@@ -306,7 +306,7 @@ func (a *App) GetAddonDescription() string {
 	case 25:
 		return "Click December production"
 	default:
-		return "Usage calculation completed. Press Alt+V with January field selected to paste"
+		return "Usage calculation completed. Press V with January field selected to paste"
 	}
 }
 
@@ -509,7 +509,7 @@ func (a *App) calcGraph(ypos int) string {
 	}
 
 	usage = (float32(ypos) - float32(a.lowerBound)) / (float32(a.upperBound) - float32(a.lowerBound))
-	correctedUsage = float32(a.inputYMax) * (usage * 1.001)
+	correctedUsage = float32(a.inputYMax) * (usage * 1.01)
 
 	if correctedUsage < 0 {
 		correctedUsage = 0

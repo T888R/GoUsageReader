@@ -104,6 +104,7 @@ h1 {
 
 .buttons {
     display: flex;
+    justify-content: center;
     gap: 10px;
 }
 
@@ -141,23 +142,26 @@ button {
 .image-controls {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
     margin-bottom: 15px;
     flex-wrap: wrap;
 }
 
-#importBtn {
+.image-controls #importBtn {
     background: var(--ctp-green);
     color: var(--ctp-base);
-    padding: 8px 16px;
+    padding: 12px 24px;
     flex: 0 0 auto;
-    font-size: 0.85rem;
+    font-size: 1rem;
 }
 
 #importBtn:hover {
     background: #369424;
     transform: translateY(-2px);
 }
+
+
 
 
 
@@ -188,7 +192,8 @@ button {
     white-space: pre-wrap;
     font-family: 'Courier New', monospace;
     color: var(--ctp-text);
-    font-size: 0.8rem;
+    font-size: 1.1rem;
+    text-align: center;
 }
 
 #pageBackground {
@@ -197,11 +202,12 @@ button {
     left: 0;
     width: calc(100vw - var(--dialog-width) - var(--left-padding));
     margin-left: var(--left-padding);
-    height: 100vh;
+    height: calc(100vh - 40px);
+    margin-top: 20px;
     z-index: -1;
     background-color: var(--ctp-crust);
     background-size: contain;
-    background-position: center;
+    background-position: center top;
     background-repeat: no-repeat;
     transform-origin: center center;
     will-change: transform;
@@ -221,7 +227,8 @@ button {
     left: 0;
     width: calc(100vw - var(--dialog-width) - var(--left-padding));
     margin-left: var(--left-padding);
-    height: 100vh;
+    height: calc(100vh - 40px);
+    margin-top: 20px;
     z-index: 10000;
     pointer-events: none;
     background-image: url("data:image/svg+xml,%3Csvg width='50' height='50' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='50' height='50' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 50 0 L 0 0 0 50' fill='none' stroke='rgba(147, 153, 178, 0.5)' stroke-width='2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)' /%3E%3C/svg%3E");
@@ -232,9 +239,9 @@ button {
 #gridToggle {
     background: var(--ctp-overlay1);
     color: var(--ctp-base);
-    padding: 8px 16px;
+    padding: 12px 24px;
     flex: 0 0 auto;
-    font-size: 0.85rem;
+    font-size: 1rem;
 }
 
 #gridToggle:hover {
@@ -311,7 +318,8 @@ button {
     left: 0;
     width: calc(100vw - var(--dialog-width) - var(--left-padding));
     margin-left: var(--left-padding);
-    height: 100vh;
+    height: calc(100vh - 40px);
+    margin-top: 20px;
     z-index: 500;
     pointer-events: none;
 }
@@ -376,7 +384,8 @@ button {
     left: 0;
     width: calc(100vw - var(--dialog-width) - var(--left-padding));
     margin-left: var(--left-padding);
-    height: 100vh;
+    height: calc(100vh - 40px);
+    margin-top: 20px;
     z-index: 400;
     pointer-events: none;
 }
@@ -439,7 +448,8 @@ button {
     left: 0;
     width: calc(100vw - var(--dialog-width) - var(--left-padding));
     margin-left: var(--left-padding);
-    height: 100vh;
+    height: calc(100vh - 40px);
+    margin-top: 20px;
     z-index: 100;
     pointer-events: none;
     background: transparent;
@@ -563,6 +573,57 @@ body.crop-mode {
     justify-content: center;
 }
 
+.crop-preview-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.rotation-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: var(--ctp-surface1);
+    padding: 10px 20px;
+    border-radius: 8px;
+}
+
+.btn-rotate {
+    background: var(--ctp-teal);
+    color: var(--ctp-base);
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-rotate:hover {
+    background: var(--ctp-sky);
+    transform: translateY(-2px);
+}
+
+.btn-rotate:disabled {
+    background: var(--ctp-surface0);
+    cursor: wait;
+    transform: none;
+}
+
+#cropPreviewImage {
+    transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.rotation-indicator {
+    color: var(--ctp-text);
+    font-weight: 600;
+    font-size: 1rem;
+    min-width: 40px;
+    text-align: center;
+}
+
 .crop-preview-buttons button {
     padding: 12px 30px;
     border: none;
@@ -592,11 +653,16 @@ body.crop-mode {
 
 #cropPreviewSkip {
     background: var(--ctp-surface0);
-    color: var(--ctp-base);
+    color: #ffffff;
     border: 2px solid var(--ctp-surface1);
+    transition: all 0.3s ease, color 0.3s ease;
 }
 
 #cropPreviewSkip:hover {
     background: var(--ctp-surface1);
     transform: translateY(-2px);
+}
+
+#cropPreviewSkip:focus {
+    color: var(--ctp-base);
 }
