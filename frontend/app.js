@@ -306,6 +306,15 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         resetView();
     }
+    if (e.key === 'o' && e.ctrlKey) {
+        e.preventDefault();
+        if (importBtn && fileInput) {
+            if (appState.perspectiveMode) {
+                disablePerspectiveMode();
+            }
+            fileInput.click();
+        }
+    }
 });
 
 // Y Max input handling - triggers standard workflow on Enter release
