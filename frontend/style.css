@@ -666,3 +666,62 @@ body.crop-mode {
 #cropPreviewSkip:focus {
     color: var(--ctp-base);
 }
+
+/* Memory Status Display */
+.memory-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 15px;
+    padding: 8px 12px;
+    background: var(--ctp-surface0);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--ctp-subtext0);
+    border: 1px solid var(--ctp-surface1);
+}
+
+.memory-label {
+    font-weight: 500;
+    color: var(--ctp-subtext1);
+}
+
+.memory-value {
+    font-family: 'Courier New', monospace;
+    color: var(--ctp-green);
+    flex: 1;
+}
+
+.memory-value.warning {
+    color: var(--ctp-yellow);
+}
+
+.memory-value.critical {
+    color: var(--ctp-red);
+    animation: pulse 1s infinite;
+}
+
+.memory-cleanup,
+.memory-toggle {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 14px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.memory-cleanup:hover,
+.memory-toggle:hover {
+    opacity: 1;
+}
+
+.memory-cleanup:active {
+    transform: scale(0.95);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}

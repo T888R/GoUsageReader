@@ -12,6 +12,7 @@ import (
 	"image/png"
 	"math"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
@@ -81,6 +82,11 @@ type App struct {
 	perspectiveMode bool          // Whether perspective mode is active
 	imgWidth        int           // Original image width
 	imgHeight       int           // Original image height
+
+	// Memory monitoring
+	memStats       runtime.MemStats
+	lastMemCheck   time.Time
+	hotkeyStopChan chan struct{} // Channel to stop hotkey listener
 }
 
 // NewApp creates a new App application struct
@@ -91,31 +97,114 @@ func NewApp() *App {
 // OnStartup is called when the app starts
 func (a *App) OnStartup(ctx context.Context) {
 	a.ctx = ctx
+	a.hotkeyStopChan = make(chan struct{})
 	// Start global hotkey listener in background
 	go a.startGlobalHotkeyListener()
+	// Start memory monitoring
+	a.StartMemoryMonitoring()
 }
 
 // OnShutdown is called when the app shuts down
 func (a *App) OnShutdown(ctx context.Context) {
+	// Signal hotkey listener to stop
+	if a.hotkeyStopChan != nil {
+		close(a.hotkeyStopChan)
+	}
+	// Clear all image data to free memory
+	a.transformedImg = nil
+	// Force final garbage collection
+	runtime.GC()
+	debug.FreeOSMemory()
+}
+
+// GetMemoryStats returns current memory statistics for debugging
+func (a *App) GetMemoryStats() map[string]interface{} {
+	runtime.ReadMemStats(&a.memStats)
+	return map[string]interface{}{
+		"alloc":         a.memStats.Alloc,
+		"totalAlloc":    a.memStats.TotalAlloc,
+		"sys":           a.memStats.Sys,
+		"numGC":         a.memStats.NumGC,
+		"heapAlloc":     a.memStats.HeapAlloc,
+		"heapSys":       a.memStats.HeapSys,
+		"heapInuse":     a.memStats.HeapInuse,
+		"heapIdle":      a.memStats.HeapIdle,
+		"heapReleased":  a.memStats.HeapReleased,
+		"lastGC":        a.memStats.LastGC,
+		"gcCPUFraction": a.memStats.GCCPUFraction,
+		"goroutines":    runtime.NumGoroutine(),
+	}
+}
+
+// ForceGarbageCollection triggers manual GC and returns memory freed
+func (a *App) ForceGarbageCollection() map[string]interface{} {
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	runtime.ReadMemStats(&after)
+
+	return map[string]interface{}{
+		"heapAllocBefore": before.HeapAlloc,
+		"heapAllocAfter":  after.HeapAlloc,
+		"heapFreed":       before.HeapAlloc - after.HeapAlloc,
+		"sysFreed":        before.Sys - after.Sys,
+	}
+}
+
+// SetMemoryLimit sets the memory limit for the application (0 = no limit)
+func (a *App) SetMemoryLimit(limitMB int64) int64 {
+	if limitMB <= 0 {
+		debug.SetMemoryLimit(-1)
+		return -1
+	}
+	limit := limitMB * 1024 * 1024 // Convert MB to bytes
+	return debug.SetMemoryLimit(limit)
+}
+
+// StartMemoryMonitoring starts periodic memory monitoring
+func (a *App) StartMemoryMonitoring() {
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-a.ctx.Done():
+				return
+			case <-ticker.C:
+				stats := a.GetMemoryStats()
+				// Log memory stats - can be sent to frontend via event
+				heapAllocMB := stats["heapAlloc"].(uint64) / 1024 / 1024
+				if heapAllocMB > 500 { // Alert if using more than 500MB
+					wailsruntime.EventsEmit(a.ctx, "memory-warning", map[string]uint64{
+						"heapAllocMB": heapAllocMB,
+					})
+				}
+			}
+		}
+	}()
 }
 
 // startGlobalHotkeyListener registers Alt+V globally and listens for the hotkey
 func (a *App) startGlobalHotkeyListener() {
-	fmt.Println("[DEBUG] Starting global hotkey listener...")
-
 	// Register 'v' key as global hotkey
 	// Using KeyUp so it only triggers once when key is released
 	hook.Register(hook.KeyUp, []string{"v"}, func(e hook.Event) {
-		fmt.Println("[DEBUG] 'v' hotkey detected!")
 		a.typeMonthlyValues()
 	})
-	fmt.Println("[DEBUG] Hook registered for 'v' key")
-
-	fmt.Println("[DEBUG] Starting hook event loop...")
 	s := hook.Start()
-	fmt.Println("[DEBUG] Hook started, waiting for events...")
-	<-hook.Process(s)
-	fmt.Println("[DEBUG] Hook process ended")
+
+	// Listen for stop signal or hook events
+	go func() {
+		<-hook.Process(s)
+	}()
+
+	// Wait for stop signal
+	<-a.hotkeyStopChan
+	hook.End()
 }
 
 // areAllValuesFilled checks if all 12 monthly values have been set
@@ -129,30 +218,18 @@ func (a *App) areAllValuesFilled() bool {
 // typeMonthlyValues types all monthly values with tabs between them
 // Only works if all values are filled and hasn't been pasted yet
 func (a *App) typeMonthlyValues() {
-	fmt.Println("[DEBUG] typeMonthlyValues called")
-	fmt.Printf("[DEBUG] hasPasted: %v\n", a.hasPasted)
-	fmt.Printf("[DEBUG] Values - Jan: '%s', Feb: '%s', Mar: '%s', Apr: '%s', May: '%s', Jun: '%s'\n",
-		a.january, a.february, a.march, a.april, a.may, a.june)
-	fmt.Printf("[DEBUG] Values - Jul: '%s', Aug: '%s', Sep: '%s', Oct: '%s', Nov: '%s', Dec: '%s'\n",
-		a.july, a.august, a.september, a.october, a.november, a.december)
-
 	// Check if values are ready and not already pasted
 	if !a.areAllValuesFilled() {
-		fmt.Println("[DEBUG] Not all values are filled, skipping")
 		return
 	}
 	if a.hasPasted {
-		fmt.Println("[DEBUG] Already pasted, skipping")
 		return
 	}
-
-	fmt.Println("[DEBUG] All checks passed, starting to type...")
 
 	// Mark as pasted to prevent double-triggering
 	a.hasPasted = true
 
 	// Delete the 'v' character that was typed when the hotkey was pressed
-	fmt.Println("[DEBUG] Deleting 'v' character")
 	robotgo.KeyTap("backspace")
 	time.Sleep(10 * time.Millisecond)
 
@@ -161,17 +238,13 @@ func (a *App) typeMonthlyValues() {
 		a.july, a.august, a.september, a.october, a.november, a.december}
 
 	for i, value := range values {
-		fmt.Printf("[DEBUG] Typing value %d: '%s'\n", i+1, value)
 		robotgo.TypeStr(value)
 		// Add tab between values (not after the last one)
 		if i < len(values)-1 {
-			fmt.Println("[DEBUG] Pressing Tab")
 			robotgo.KeyTap("tab")
 			time.Sleep(10 * time.Millisecond) // 10ms delay as requested
 		}
 	}
-
-	fmt.Println("[DEBUG] Finished typing, resetting...")
 
 	// Reset after typing is complete
 	go func() {
@@ -313,25 +386,19 @@ func (a *App) GetAddonDescription() string {
 // HandleClick processes a click at the given Y coordinate
 // This is called from the frontend with the Y position relative to the image
 func (a *App) HandleClick(yPos int) (*ClickResult, error) {
-	fmt.Printf("HandleClick called with yPos: %d\n", yPos)
-	fmt.Printf("Current state - maxYRes: %d, inputYMax: %d, clickCount: %d\n", a.maxYRes, a.inputYMax, a.clickCount)
-
 	// Calculate the position based on window height (maxYRes)
 	correct := a.maxYRes - yPos
 	pos := fmt.Sprint(correct)
 	yAxisLocation, _ := strconv.Atoi(pos)
-	fmt.Printf("Calculated yAxisLocation: %d\n", yAxisLocation)
 
 	var reading string
 	var desc string
 
 	switch a.clickCount {
 	case 0:
-		fmt.Println("Maximum set")
 		a.upperBound = yAxisLocation
 		reading = "Maximum set"
 	case 1:
-		fmt.Println("Origin set")
 		a.lowerBound = yAxisLocation
 		reading = "Origin set"
 	case 2:
@@ -380,7 +447,6 @@ func (a *App) HandleClick(yPos int) (*ClickResult, error) {
 
 	a.clickCount++
 	desc = a.GetDescription()
-	fmt.Printf("HandleClick returning - reading: %q, desc: %q\n", reading, desc)
 	return &ClickResult{Reading: reading, Description: desc}, nil
 }
 
@@ -396,11 +462,9 @@ func (a *App) HandleAddonClick(yPos int) (*ClickResult, error) {
 
 	switch a.clickCount {
 	case 0:
-		fmt.Println("Maximum set")
 		a.upperBound = yAxisLocation
 		reading = "Maximum set"
 	case 1:
-		fmt.Println("Origin set")
 		a.lowerBound = yAxisLocation
 		reading = "Origin set"
 	case 2:
@@ -1070,9 +1134,6 @@ func solveLinearSystem(A [][]float64, b []float64) []float64 {
 // x, y are the top-left coordinates, width and height are the dimensions
 // imageData is a base64 encoded string
 func (a *App) ApplyCrop(imageDataBase64 string, x, y, cropWidth, cropHeight int) ([]byte, error) {
-	// Log received data info
-	fmt.Printf("ApplyCrop received base64 string length: %d, crop region: (%d,%d,%d,%d)\n", len(imageDataBase64), x, y, cropWidth, cropHeight)
-
 	if len(imageDataBase64) < 10 {
 		return nil, fmt.Errorf("image data too small: %d bytes", len(imageDataBase64))
 	}
@@ -1080,65 +1141,41 @@ func (a *App) ApplyCrop(imageDataBase64 string, x, y, cropWidth, cropHeight int)
 	// Decode base64 string to bytes
 	imageData, err := base64.StdEncoding.DecodeString(imageDataBase64)
 	if err != nil {
-		fmt.Printf("ERROR: Failed to decode base64: %v\n", err)
 		return nil, fmt.Errorf("failed to decode base64 image data: %w", err)
 	}
-
-	fmt.Printf("Decoded image data size: %d bytes\n", len(imageData))
 
 	if len(imageData) < 10 {
 		return nil, fmt.Errorf("decoded image data too small: %d bytes", len(imageData))
 	}
 
-	// Log first bytes to check format
-	fmt.Printf("First 10 bytes: %v\n", imageData[:10])
-
-	// Check for PNG signature
-	isPNG := len(imageData) > 8 && imageData[0] == 137 && imageData[1] == 80 && imageData[2] == 78 && imageData[3] == 71
-	isJPEG := len(imageData) > 2 && imageData[0] == 255 && imageData[1] == 216
-	fmt.Printf("Detected format - PNG: %v, JPEG: %v\n", isPNG, isJPEG)
-
 	// Decode the source image
-	srcImg, format, err := image.Decode(bytes.NewReader(imageData))
+	srcImg, _, err := image.Decode(bytes.NewReader(imageData))
 	if err != nil {
-		fmt.Printf("ERROR: Failed to decode image: %v\n", err)
 		return nil, fmt.Errorf("failed to decode image: %w", err)
 	}
-	fmt.Printf("Successfully decoded %s image\n", format)
 
 	srcBounds := srcImg.Bounds()
 	srcWidth := srcBounds.Dx()
 	srcHeight := srcBounds.Dy()
-	fmt.Printf("Source image bounds: %v, size: %dx%d\n", srcBounds, srcWidth, srcHeight)
-	fmt.Printf("Requested crop: x=%d, y=%d, width=%d, height=%d\n", x, y, cropWidth, cropHeight)
 
 	// Validate crop bounds
 	if x < 0 {
-		fmt.Printf("Adjusting x from %d to 0\n", x)
 		x = 0
 	}
 	if y < 0 {
-		fmt.Printf("Adjusting y from %d to 0\n", y)
 		y = 0
 	}
 	if x+cropWidth > srcWidth {
-		oldWidth := cropWidth
 		cropWidth = srcWidth - x
-		fmt.Printf("Adjusting width from %d to %d (x=%d, srcWidth=%d)\n", oldWidth, cropWidth, x, srcWidth)
 	}
 	if y+cropHeight > srcHeight {
-		oldHeight := cropHeight
 		cropHeight = srcHeight - y
-		fmt.Printf("Adjusting height from %d to %d (y=%d, srcHeight=%d)\n", oldHeight, cropHeight, y, srcHeight)
 	}
 
 	// Ensure valid dimensions
 	if cropWidth <= 0 || cropHeight <= 0 {
-		fmt.Printf("ERROR: Invalid crop dimensions after adjustment: width=%d, height=%d\n", cropWidth, cropHeight)
 		return nil, fmt.Errorf("invalid crop dimensions: width=%d, height=%d", cropWidth, cropHeight)
 	}
-
-	fmt.Printf("Final crop dimensions: %dx%d at (%d,%d)\n", cropWidth, cropHeight, x, y)
 
 	// Create destination image
 	dstImg := image.NewRGBA(image.Rect(0, 0, cropWidth, cropHeight))
@@ -1159,12 +1196,10 @@ func (a *App) ApplyCrop(imageDataBase64 string, x, y, cropWidth, cropHeight int)
 	// Encode result as PNG
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, dstImg); err != nil {
-		fmt.Printf("ERROR: Failed to encode PNG: %v\n", err)
 		return nil, fmt.Errorf("failed to encode cropped image: %w", err)
 	}
 
 	result := buf.Bytes()
-	fmt.Printf("Successfully encoded PNG, result size: %d bytes\n", len(result))
 
 	// Hint to GC that large allocations can be freed
 	runtime.GC()

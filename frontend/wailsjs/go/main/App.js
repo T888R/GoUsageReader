@@ -14,6 +14,10 @@ export function ApplyPerspectiveTransformParallel(arg1, arg2, arg3, arg4, arg5) 
   return window['go']['main']['App']['ApplyPerspectiveTransformParallel'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function ForceGarbageCollection() {
+  return window['go']['main']['App']['ForceGarbageCollection']();
+}
+
 export function GetAddonDescription() {
   return window['go']['main']['App']['GetAddonDescription']();
 }
@@ -36,6 +40,10 @@ export function GetDescription() {
 
 export function GetImageDimensions() {
   return window['go']['main']['App']['GetImageDimensions']();
+}
+
+export function GetMemoryStats() {
+  return window['go']['main']['App']['GetMemoryStats']();
 }
 
 export function GetTransformedImage() {
@@ -86,6 +94,10 @@ export function SetImageDimensions(arg1, arg2) {
   return window['go']['main']['App']['SetImageDimensions'](arg1, arg2);
 }
 
+export function SetMemoryLimit(arg1) {
+  return window['go']['main']['App']['SetMemoryLimit'](arg1);
+}
+
 export function SetPerspectiveMode(arg1) {
   return window['go']['main']['App']['SetPerspectiveMode'](arg1);
 }
@@ -100,6 +112,10 @@ export function SetYMax(arg1) {
 
 export function StartAddonUsage() {
   return window['go']['main']['App']['StartAddonUsage']();
+}
+
+export function StartMemoryMonitoring() {
+  return window['go']['main']['App']['StartMemoryMonitoring']();
 }
 
 export function StartRegularUsage() {

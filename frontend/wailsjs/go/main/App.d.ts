@@ -8,6 +8,8 @@ export function ApplyPerspectiveTransform(arg1:string,arg2:number,arg3:number):P
 
 export function ApplyPerspectiveTransformParallel(arg1:Array<number>,arg2:number,arg3:number,arg4:any,arg5:any):Promise<Array<number>>;
 
+export function ForceGarbageCollection():Promise<Record<string, any>>;
+
 export function GetAddonDescription():Promise<string>;
 
 export function GetAllReadings():Promise<string>;
@@ -19,6 +21,8 @@ export function GetCornerPoints():Promise<any>;
 export function GetDescription():Promise<string>;
 
 export function GetImageDimensions():Promise<number|number>;
+
+export function GetMemoryStats():Promise<Record<string, any>>;
 
 export function GetTransformedImage():Promise<Array<number>>;
 
@@ -44,6 +48,8 @@ export function SetCornerPoints(arg1:any):Promise<void>;
 
 export function SetImageDimensions(arg1:number,arg2:number):Promise<void>;
 
+export function SetMemoryLimit(arg1:number):Promise<number>;
+
 export function SetPerspectiveMode(arg1:boolean):Promise<void>;
 
 export function SetWindowHeight(arg1:number):Promise<void>;
@@ -51,5 +57,7 @@ export function SetWindowHeight(arg1:number):Promise<void>;
 export function SetYMax(arg1:number):Promise<void>;
 
 export function StartAddonUsage():Promise<void>;
+
+export function StartMemoryMonitoring():Promise<void>;
 
 export function StartRegularUsage():Promise<void>;

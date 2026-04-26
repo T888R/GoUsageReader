@@ -117,6 +117,13 @@
       <div class="readings">
         <pre id="readingsOutput"></pre>
       </div>
+
+      <div class="memory-status" id="memoryStatus" style="display: none;">
+        <span class="memory-label">Memory:</span>
+        <span class="memory-value" id="memoryValue">--</span>
+        <button class="memory-cleanup" id="memoryCleanupBtn" title="Force garbage collection">🗑️</button>
+        <button class="memory-toggle" id="memoryToggleBtn" title="Toggle memory monitoring">📊</button>
+      </div>
     </div>
 
     <script src="app.js"></script>

@@ -1,12 +1,4 @@
-console.log('APP.JS STARTING TO LOAD - Line 1');
-
 // Check if Go runtime is available
-console.log('window.go available:', !!window.go);
-console.log('window.go.main available:', !!(window.go && window.go.main));
-console.log('window.go.main.App available:', !!(window.go && window.go.main && window.go.main.App));
-if (window.go && window.go.main && window.go.main.App) {
-    console.log('Go methods available:', Object.keys(window.go.main.App));
-}
 
 // Application state - use window.appState to make it global
 if (!window.appState) {
@@ -30,7 +22,11 @@ window.appState = {
     draggedCorner: null,
     originalImageData: null,
     originalImageBlob: null, // Store the actual blob data for transforms
-    rotationAngle: 0 // Current rotation angle in degrees (0, 90, 180, 270)
+    rotationAngle: 0, // Current rotation angle in degrees (0, 90, 180, 270)
+    // Memory monitoring
+    memoryStats: null,
+    memoryWarningThreshold: 500 * 1024 * 1024, // 500MB
+    lastMemoryCheck: 0
 };
 
 // Create local reference
@@ -77,24 +73,17 @@ if (isGoAvailable()) {
 async function callGo(methodName, ...args) {
     // Always check window.go directly in case it loaded after script initialization
     if (!window.go || !window.go.main || !window.go.main.App) {
-        console.warn(`Go runtime not available for ${methodName}`);
-        console.log('window.go:', window.go);
-        console.log('window.go?.main:', window.go?.main);
         return null;
     }
     
     if (!window.go.main.App[methodName]) {
-        console.warn(`Go method ${methodName} not found. Available:`, Object.keys(window.go.main.App));
         return null;
     }
     
     try {
-        console.log(`Calling ${methodName} with args:`, args);
         const result = await window.go.main.App[methodName](...args);
-        console.log(`${methodName} raw result:`, result);
         return result;
     } catch (err) {
-        console.error(`Error calling ${methodName}:`, err);
         throw err;
     }
 }
@@ -102,36 +91,28 @@ async function callGo(methodName, ...args) {
 // Helper function to extract reading from Wails result
 // Handles struct format {reading: string, description: string} from Go
 function extractReading(result) {
-    console.log('extractReading called with:', result, 'type:', typeof result);
-
     if (!result) {
-        console.log('extractReading: result is null/undefined, returning empty string');
         return '';
     }
 
     // Check if it's the new struct format from Go
     if (typeof result === 'object' && result.reading !== undefined) {
-        console.log('extractReading: found struct format, reading:', result.reading);
         return result.reading;
     }
 
     // Check if it's an array (from mock runtime.js)
     if (Array.isArray(result)) {
-        console.log('extractReading: result is array, returning:', result[0]);
         return result[0] || '';
     }
 
     // Check if it's an object with numbered properties (old Wails v2 format)
     if (typeof result === 'object') {
-        console.log('extractReading: result is object, keys:', Object.keys(result));
         if (result.r0 !== undefined) {
-            console.log('extractReading: found r0:', result.r0);
             return result.r0;
         }
         // Fallback: try to find any string property
         for (const key in result) {
             if (typeof result[key] === 'string' && result[key].length > 0) {
-                console.log('extractReading: found string property', key, ':', result[key]);
                 return result[key];
             }
         }
@@ -139,27 +120,21 @@ function extractReading(result) {
 
     // If it's a string, return it directly
     if (typeof result === 'string') {
-        console.log('extractReading: result is string:', result);
         return result;
     }
 
-    console.log('extractReading: no match found, returning empty string');
     return '';
 }
 
 // Image import - uses HTML file input
 if (importBtn && fileInput) {
     importBtn.addEventListener('click', () => {
-        console.log('Import button clicked, triggering file input');
         // Turn off perspective mode when importing a new image
         if (appState.perspectiveMode) {
             disablePerspectiveMode();
         }
         fileInput.click();
     });
-    console.log('Import button listener attached successfully');
-} else {
-    console.error('Import button or file input not found:', { importBtn: !!importBtn, fileInput: !!fileInput });
 }
 
 // Grid toggle
@@ -237,45 +212,31 @@ document.addEventListener('mousedown', (e) => {
 // Handle capture click - sends Y coordinate to backend
 async function handleCaptureClick(e) {
     if (!appState.mode) {
-        console.log('handleCaptureClick: no mode active');
         return;
     }
     
     // Get click position relative to the window (for full-page background)
     const yPos = e.clientY;
-    console.log('handleCaptureClick: yPos =', yPos, 'windowHeight =', window.innerHeight, 'mode =', appState.mode);
     
     // Send to backend
     try {
         let result;
         let reading = '';
         if (appState.mode === 'standard') {
-            console.log('Calling HandleClick with yPos:', yPos);
-            console.log('window.go.main.App exists:', !!(window.go && window.go.main && window.go.main.App));
-            console.log('window.go.main.App.HandleClick exists:', !!(window.go && window.go.main && window.go.main.App && window.go.main.App.HandleClick));
             result = await callGo("HandleClick", yPos);
-            console.log('HandleClick result type:', typeof result, 'value:', result, 'JSON:', JSON.stringify(result));
             // Wails returns multiple values as an object with properties
             reading = extractReading(result);
-            console.log('Extracted reading:', reading);
             await updateDescription();
         } else {
-            console.log('Calling HandleAddonClick with yPos:', yPos);
             result = await callGo("HandleAddonClick", yPos);
-            console.log('HandleAddonClick result type:', typeof result, 'value:', result);
             reading = extractReading(result);
-            console.log('Extracted reading:', reading);
             await updateAddonDescription();
         }
         
         // Display the reading
         if (reading) {
-            console.log('Displaying reading:', reading);
             readingsOutput.textContent += reading + '\n';
             readingsOutput.scrollTop = readingsOutput.scrollHeight;
-            console.log('Reading displayed successfully');
-        } else {
-            console.warn('No reading to display. Result was:', result);
         }
         
         // Check if mode was disabled after this click (e.g., after December)
@@ -295,8 +256,7 @@ async function handleCaptureClick(e) {
             showNotification('All months captured! Paste values to spreadsheet.');
         }
     } catch (err) {
-        console.error('Error handling click:', err);
-        console.error('Error stack:', err.stack);
+        // Error handling
     }
 }
 
@@ -555,7 +515,6 @@ window.addEventListener('resize', () => {
 });
 
 // Initialize
-console.log('Usage Reader initialized');
 
 // Add escape key to reset
 document.addEventListener('keydown', async (e) => {
@@ -679,7 +638,6 @@ function getImageBounds() {
     
     // Check if we have raw image dimensions stored
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
-        console.warn('Raw image dimensions not available');
         return null;
     }
     
@@ -722,7 +680,6 @@ function getImageBounds() {
 // Reset corner positions to image corners
 function resetCornersToImageBounds() {
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
-        console.error('Raw image dimensions not available');
         return;
     }
     
@@ -864,7 +821,6 @@ function applyPerspectivePreview() {
     
     // Destination corners (dragged positions) - convert from raw pixels to screen coords
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
-        console.error('Raw image dimensions not available for preview');
         return;
     }
     
@@ -1144,7 +1100,6 @@ function hidePerspectivePreview() {
 // Update corner handle positions based on raw image pixel coordinates
 function updateCornerPositions() {
     if (!appState.rawImageWidth || !appState.rawImageHeight) {
-        console.error('Raw image dimensions not available for display');
         return;
     }
     
@@ -1493,7 +1448,6 @@ async function applyPerspectiveTransform() {
         }
         
     } catch (error) {
-        console.error('Perspective transform error:', error);
         showNotification('Error applying perspective transform: ' + error.message);
     }
 }
@@ -2862,3 +2816,240 @@ if (pageBackground) {
 }
 
 console.log('Usage Reader with perspective transform and crop tool initialized');
+
+// ============================================
+// MEMORY MONITORING AND DEBUGGING FUNCTIONS
+// ============================================
+
+// Listen for memory warnings from backend
+if (window.runtime && window.runtime.EventsOn) {
+    window.runtime.EventsOn('memory-warning', (data) => {
+        console.warn('Memory warning from backend:', data);
+        showNotification(`Warning: High memory usage (${data.heapAllocMB}MB)`);
+    });
+}
+
+// Get memory stats from backend
+async function getBackendMemoryStats() {
+    if (!isGoAvailable()) {
+        console.log('Go backend not available');
+        return null;
+    }
+    try {
+        const stats = await callGo('GetMemoryStats');
+        console.log('Backend memory stats:', stats);
+        return stats;
+    } catch (err) {
+        console.error('Error getting memory stats:', err);
+        return null;
+    }
+}
+
+// Force garbage collection in backend
+async function forceBackendGC() {
+    if (!isGoAvailable()) {
+        console.log('Go backend not available');
+        return null;
+    }
+    try {
+        const result = await callGo('ForceGarbageCollection');
+        console.log('Garbage collection result:', result);
+        showNotification(`GC completed: ${(result.heapFreed / 1024 / 1024).toFixed(2)}MB freed`);
+        return result;
+    } catch (err) {
+        console.error('Error forcing GC:', err);
+        return null;
+    }
+}
+
+// Get frontend memory info (Chrome/Edge only)
+function getFrontendMemoryInfo() {
+    if (performance && performance.memory) {
+        const memory = performance.memory;
+        return {
+            usedJSHeapSize: memory.usedJSHeapSize,
+            totalJSHeapSize: memory.totalJSHeapSize,
+            jsHeapSizeLimit: memory.jsHeapSizeLimit,
+            usedMB: (memory.usedJSHeapSize / 1024 / 1024).toFixed(2),
+            totalMB: (memory.totalJSHeapSize / 1024 / 1024).toFixed(2),
+            limitMB: (memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2)
+        };
+    }
+    return null;
+}
+
+// Comprehensive memory report
+async function getMemoryReport() {
+    const report = {
+        timestamp: new Date().toISOString(),
+        frontend: getFrontendMemoryInfo(),
+        backend: await getBackendMemoryStats(),
+        frontendState: {
+            hasImage: !!appState.originalImageBlob,
+            imageDataLength: appState.originalImageBlob ? appState.originalImageBlob.length : 0,
+            imageDataMB: appState.originalImageBlob ? (appState.originalImageBlob.length / 1024 / 1024).toFixed(2) : 0,
+            perspectiveMode: appState.perspectiveMode,
+            cropMode: appState.cropMode,
+            mode: appState.mode
+        }
+    };
+    
+    console.log('=== MEMORY REPORT ===', report);
+    return report;
+}
+
+// Periodic memory monitoring
+function startMemoryMonitoring(intervalMs = 60000) {
+    console.log(`Starting memory monitoring every ${intervalMs}ms`);
+    
+    // Initial check
+    getMemoryReport();
+    
+    // Set up interval
+    const intervalId = setInterval(async () => {
+        const report = await getMemoryReport();
+        
+        // Check for high memory usage
+        const frontendMB = report.frontend ? parseFloat(report.frontend.usedMB) : 0;
+        const backendMB = report.backend ? report.backend.heapAlloc / 1024 / 1024 : 0;
+        const imageMB = parseFloat(report.frontendState.imageDataMB);
+        
+        const totalMB = frontendMB + backendMB;
+        
+        if (totalMB > 500) { // 500MB threshold
+            console.warn(`High memory usage detected: ${totalMB.toFixed(2)}MB total`);
+            showNotification(`High memory usage: ${totalMB.toFixed(0)}MB`);
+            
+            // Try to free memory
+            await cleanupMemory();
+        }
+        
+        // Log every 5 minutes regardless
+        if (Date.now() - appState.lastMemoryCheck > 300000) {
+            console.log('Periodic memory check:', {
+                frontend: `${frontendMB.toFixed(2)}MB`,
+                backend: `${backendMB.toFixed(2)}MB`,
+                image: `${imageMB.toFixed(2)}MB`
+            });
+            appState.lastMemoryCheck = Date.now();
+        }
+    }, intervalMs);
+    
+    // Return function to stop monitoring
+    return () => clearInterval(intervalId);
+}
+
+// Memory cleanup function
+async function cleanupMemory() {
+    console.log('Running memory cleanup...');
+    
+    // 1. Clear any unused canvases
+    const canvases = document.querySelectorAll('canvas');
+    canvases.forEach(canvas => {
+        if (canvas.id !== 'perspectivePreviewCanvas' && !canvas.parentElement) {
+            canvas.width = 0;
+            canvas.height = 0;
+        }
+    });
+    
+    // 2. Force backend GC
+    await forceBackendGC();
+    
+    // 3. Clear image blob if no longer needed (optional - be careful with this)
+    // Only clear if we're not in the middle of processing
+    if (!appState.perspectiveMode && !appState.cropMode && !appState.mode) {
+        // Safe to potentially clear, but let's keep it for now
+        // and just ensure we're not holding duplicates
+    }
+    
+    // 4. Get report after cleanup
+    const afterReport = await getMemoryReport();
+    console.log('Memory cleanup completed');
+    
+    return afterReport;
+}
+
+// Expose memory functions globally for debugging
+window.getMemoryReport = getMemoryReport;
+window.forceBackendGC = forceBackendGC;
+window.getBackendMemoryStats = getBackendMemoryStats;
+window.getFrontendMemoryInfo = getFrontendMemoryInfo;
+window.cleanupMemory = cleanupMemory;
+
+// Start monitoring when app initializes
+if (isGoAvailable()) {
+    startMemoryMonitoring(60000); // Check every minute
+    initMemoryUI();
+}
+
+// Memory UI controls
+let memoryMonitoringEnabled = false;
+let memoryMonitoringInterval = null;
+
+function initMemoryUI() {
+    const memoryStatus = document.getElementById('memoryStatus');
+    const memoryValue = document.getElementById('memoryValue');
+    const cleanupBtn = document.getElementById('memoryCleanupBtn');
+    const toggleBtn = document.getElementById('memoryToggleBtn');
+    
+    if (!memoryStatus) return;
+    
+    // Show the memory status container
+    memoryStatus.style.display = 'flex';
+    
+    // Cleanup button
+    if (cleanupBtn) {
+        cleanupBtn.addEventListener('click', async () => {
+            cleanupBtn.style.transform = 'scale(0.9)';
+            await cleanupMemory();
+            setTimeout(() => {
+                cleanupBtn.style.transform = '';
+            }, 200);
+            updateMemoryDisplay();
+        });
+    }
+    
+    // Toggle button
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            memoryMonitoringEnabled = !memoryMonitoringEnabled;
+            toggleBtn.style.opacity = memoryMonitoringEnabled ? '1' : '0.5';
+            
+            if (memoryMonitoringEnabled) {
+                updateMemoryDisplay();
+                memoryMonitoringInterval = setInterval(updateMemoryDisplay, 5000);
+            } else {
+                clearInterval(memoryMonitoringInterval);
+                memoryValue.textContent = '--';
+                memoryValue.className = 'memory-value';
+            }
+        });
+    }
+    
+    // Initial display update
+    updateMemoryDisplay();
+}
+
+async function updateMemoryDisplay() {
+    const memoryValue = document.getElementById('memoryValue');
+    if (!memoryValue || !memoryMonitoringEnabled) return;
+    
+    try {
+        const report = await getMemoryReport();
+        const frontendMB = report.frontend ? parseFloat(report.frontend.usedMB) : 0;
+        const backendMB = report.backend ? report.backend.heapAlloc / 1024 / 1024 : 0;
+        const totalMB = frontendMB + backendMB;
+        
+        memoryValue.textContent = `${totalMB.toFixed(0)}MB`;
+        
+        // Color code based on usage
+        memoryValue.className = 'memory-value';
+        if (totalMB > 1000) {
+            memoryValue.classList.add('critical');
+        } else if (totalMB > 500) {
+            memoryValue.classList.add('warning');
+        }
+    } catch (err) {
+        memoryValue.textContent = 'Error';
+    }
+}

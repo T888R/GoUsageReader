@@ -25,5 +25,9 @@
     "productVersion": "1.0.0",
     "copyright": "Copyright © 2024",
     "comments": "A tool for reading usage graphs"
+  },
+  "build": {
+    "ldflags": "-s -w",
+    "compressionLevel": 9
   }
 }
