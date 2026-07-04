@@ -148,26 +148,148 @@ gridToggle.addEventListener('click', () => {
 });
 
 fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        // If we're in the middle of usage input, reset the state
-        if (appState.mode) {
-            await resetUsageState();
-        }
-        
-        // Clean up previous image data before loading new one
-        cleanupImageData();
-        
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            // Reset rotation when importing a new image
-            appState.rotationAngle = 0;
-            // Show crop preview modal which will normalize image orientation
-            showCropPreviewModal(event.target.result);
-        };
-        reader.readAsDataURL(file);
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    // If we're in the middle of usage input, reset the state
+    if (appState.mode) {
+        await resetUsageState();
+    }
+    
+    // Clean up previous image data before loading new one
+    cleanupImageData();
+    
+    if (files.length === 1) {
+        // Single file mode - process normally
+        await processSingleFile(files[0]);
+    } else {
+        // Multi-file mode - process sequentially with aggregation
+        await processMultipleFiles(files);
     }
 });
+
+// Process a single file (normal mode)
+async function processSingleFile(file) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        // Reset rotation when importing a new image
+        appState.rotationAngle = 0;
+        // Show crop preview modal which will normalize image orientation
+        showCropPreviewModal(event.target.result);
+    };
+    reader.readAsDataURL(file);
+}
+
+// Multi-file processing state
+appState.multiFileQueue = [];
+appState.currentFileIndex = 0;
+appState.isProcessingMultiFile = false;
+appState.isWaitingForNextFile = false; // True when auto-transitioning between files
+
+// Process multiple files sequentially with aggregation
+async function processMultipleFiles(files) {
+    // Initialize multi-file mode in backend
+    if (isGoAvailable()) {
+        await callGo("StartMultiFileProcessing", files.length);
+    }
+    
+    // Store the queue and start processing
+    appState.multiFileQueue = files;
+    appState.currentFileIndex = 0;
+    appState.isProcessingMultiFile = true;
+    
+    // Show multi-file progress UI
+    showMultiFileProgress(0, files.length);
+    
+    // Process the first file
+    await processNextMultiFile();
+}
+
+// Process the next file in the multi-file queue
+async function processNextMultiFile() {
+    if (!appState.isProcessingMultiFile) return;
+    
+    // Sync index with backend to ensure we're on the right file
+    const backendIndex = await callGo("GetCurrentFileIndex");
+    appState.currentFileIndex = backendIndex;
+    
+    const index = appState.currentFileIndex;
+    const files = appState.multiFileQueue;
+    
+    if (index >= files.length) {
+        // All files processed
+        appState.isProcessingMultiFile = false;
+        appState.isWaitingForNextFile = false;
+        appState.multiFileQueue = [];
+        hideMultiFileProgress();
+        showNotification('All files processed! Values aggregated.');
+        return;
+    }
+    
+    // Not waiting anymore - file is ready for user
+    appState.isWaitingForNextFile = false;
+    
+    // Update progress
+    showMultiFileProgress(index + 1, files.length);
+    
+    // Read and process the file
+    const file = files[index];
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        // Reset rotation when importing a new image
+        appState.rotationAngle = 0;
+        // Show crop preview modal with multi-file mode enabled
+        showCropPreviewModalMultiFile(event.target.result, index + 1, files.length);
+    };
+    reader.readAsDataURL(file);
+}
+
+// Multi-file progress UI
+function showMultiFileProgress(current, total) {
+    let progressEl = document.getElementById('multiFileProgress');
+    if (!progressEl) {
+        progressEl = document.createElement('div');
+        progressEl.id = 'multiFileProgress';
+        progressEl.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 11000;
+            font-weight: 500;
+        `;
+        document.body.appendChild(progressEl);
+    }
+    progressEl.textContent = `Processing file ${current} of ${total}`;
+    progressEl.style.display = 'block';
+}
+
+function hideMultiFileProgress() {
+    const progressEl = document.getElementById('multiFileProgress');
+    if (progressEl) {
+        progressEl.style.display = 'none';
+    }
+}
+
+// Modified crop preview modal for multi-file mode
+function showCropPreviewModalMultiFile(imageDataUrl, currentFile, totalFiles) {
+    if (!cropPreviewModal) {
+        initCropPreviewElements();
+    }
+    
+    // Update title to show file number
+    const titleEl = cropPreviewModal.querySelector('h2');
+    if (titleEl) {
+        titleEl.textContent = `Crop Image ${currentFile} of ${totalFiles}`;
+    }
+    
+    // Show the modal (reuse existing logic)
+    showCropPreviewModal(imageDataUrl);
+}
 
 
 
@@ -253,7 +375,42 @@ async function handleCaptureClick(e) {
             appState.mode = null;
             standardBtn.classList.remove('mode-active');
             addonBtn.classList.remove('mode-active');
-            showNotification('All months captured! Paste values to spreadsheet.');
+            
+            // Check if we're in multi-file mode
+            const isMultiFile = await callGo("IsMultiFileMode");
+            if (isMultiFile && appState.isProcessingMultiFile) {
+                // Move to next file (this updates the buffer and increments index in backend)
+                const hasMoreFiles = await callGo("MoveToNextFile");
+                // Update frontend index to match backend
+                appState.currentFileIndex = await callGo("GetCurrentFileIndex");
+                if (hasMoreFiles) {
+                    showNotification('File ' + (appState.currentFileIndex) + ' complete. Starting next file...');
+                    // Set waiting flag to prevent button presses during transition
+                    appState.isWaitingForNextFile = true;
+                    // Clear the UI for next file
+                    readingsOutput.textContent = '';
+                    description.textContent = 'Import an image and enter Y-axis max to begin';
+                    
+                    // Clear the background image to prompt user to import next file
+                    setTimeout(() => {
+                        cleanupImageData();
+                        // Trigger file input for next file after a short delay
+                        setTimeout(() => {
+                            processNextMultiFile();
+                        }, 500);
+                    }, 1000);
+                } else {
+                    // All files complete
+                    appState.isProcessingMultiFile = false;
+                    appState.isWaitingForNextFile = false;
+                    hideMultiFileProgress();
+                    showNotification('All files processed! Press V with January field selected to paste aggregated values.');
+                    // Update readings output with final aggregated values
+                    updateReadingsWithAggregatedValues();
+                }
+            } else {
+                showNotification('All months captured! Paste values to spreadsheet.');
+            }
         }
     } catch (err) {
         // Error handling
@@ -291,6 +448,12 @@ yMaxInput.addEventListener('keyup', (e) => {
 
 // Start the standard usage workflow
 async function startStandardWorkflow(value) {
+    // Prevent starting if in auto-transition between files
+    if (appState.isWaitingForNextFile) {
+        showNotification('Please wait for the next file to load...');
+        return;
+    }
+    
     appState.mode = 'standard';
     standardBtn.classList.add('mode-active');
     addonBtn.classList.remove('mode-active');
@@ -319,6 +482,12 @@ standardBtn.addEventListener('click', async () => {
 addonBtn.addEventListener('click', async () => {
     const value = parseInt(yMaxInput.value);
     if (value > 0) {
+        // Prevent starting if in auto-transition between files
+        if (appState.isWaitingForNextFile) {
+            showNotification('Please wait for the next file to load...');
+            return;
+        }
+        
         appState.mode = 'addon';
         addonBtn.classList.add('mode-active');
         standardBtn.classList.remove('mode-active');
@@ -356,8 +525,36 @@ async function updateAddonDescription() {
 if (window.runtime && window.runtime.EventsOn) {
     window.runtime.EventsOn('auto-paste', (data) => {
         // Show notification that Alt+V hotkey is ready
-        showNotification('Press v with January selected to paste');
+        if (appState.isProcessingMultiFile) {
+            showNotification('File complete. Continue with next file...');
+        } else {
+            showNotification('Press v with January selected to paste');
+        }
     });
+}
+
+// Update readings output with aggregated values
+async function updateReadingsWithAggregatedValues() {
+    if (!isGoAvailable()) return;
+    
+    const aggregated = await callGo("GetAggregatedValues");
+    if (aggregated) {
+        readingsOutput.textContent = 
+            `January: ${aggregated.january}\n` +
+            `February: ${aggregated.february}\n` +
+            `March: ${aggregated.march}\n` +
+            `April: ${aggregated.april}\n` +
+            `May: ${aggregated.may}\n` +
+            `June: ${aggregated.june}\n` +
+            `July: ${aggregated.july}\n` +
+            `August: ${aggregated.august}\n` +
+            `September: ${aggregated.september}\n` +
+            `October: ${aggregated.october}\n` +
+            `November: ${aggregated.november}\n` +
+            `December: ${aggregated.december}\n` +
+            '\n--- AGGREGATED TOTALS ---';
+        readingsOutput.scrollTop = readingsOutput.scrollHeight;
+    }
 }
 
 // Show notification
@@ -401,6 +598,13 @@ async function resetAll() {
 
     // Clean up image data to free memory
     cleanupImageData();
+    
+    // Reset multi-file state
+    appState.multiFileQueue = [];
+    appState.currentFileIndex = 0;
+    appState.isProcessingMultiFile = false;
+    appState.isWaitingForNextFile = false;
+    hideMultiFileProgress();
 
     resetView();
 }

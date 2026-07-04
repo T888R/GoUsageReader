@@ -22,6 +22,10 @@ export function GetAddonDescription() {
   return window['go']['main']['App']['GetAddonDescription']();
 }
 
+export function GetAggregatedValues() {
+  return window['go']['main']['App']['GetAggregatedValues']();
+}
+
 export function GetAllReadings() {
   return window['go']['main']['App']['GetAllReadings']();
 }
@@ -34,6 +38,10 @@ export function GetCornerPoints() {
   return window['go']['main']['App']['GetCornerPoints']();
 }
 
+export function GetCurrentFileIndex() {
+  return window['go']['main']['App']['GetCurrentFileIndex']();
+}
+
 export function GetDescription() {
   return window['go']['main']['App']['GetDescription']();
 }
@@ -44,6 +52,10 @@ export function GetImageDimensions() {
 
 export function GetMemoryStats() {
   return window['go']['main']['App']['GetMemoryStats']();
+}
+
+export function GetTotalFiles() {
+  return window['go']['main']['App']['GetTotalFiles']();
 }
 
 export function GetTransformedImage() {
@@ -70,12 +82,20 @@ export function IsAddonMode() {
   return window['go']['main']['App']['IsAddonMode']();
 }
 
+export function IsMultiFileMode() {
+  return window['go']['main']['App']['IsMultiFileMode']();
+}
+
 export function IsPerspectiveMode() {
   return window['go']['main']['App']['IsPerspectiveMode']();
 }
 
 export function IsRegularMode() {
   return window['go']['main']['App']['IsRegularMode']();
+}
+
+export function MoveToNextFile() {
+  return window['go']['main']['App']['MoveToNextFile']();
 }
 
 export function Reset() {
@@ -116,6 +136,10 @@ export function StartAddonUsage() {
 
 export function StartMemoryMonitoring() {
   return window['go']['main']['App']['StartMemoryMonitoring']();
+}
+
+export function StartMultiFileProcessing(arg1) {
+  return window['go']['main']['App']['StartMultiFileProcessing'](arg1);
 }
 
 export function StartRegularUsage() {

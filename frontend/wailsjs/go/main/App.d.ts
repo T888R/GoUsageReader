@@ -12,17 +12,23 @@ export function ForceGarbageCollection():Promise<Record<string, any>>;
 
 export function GetAddonDescription():Promise<string>;
 
+export function GetAggregatedValues():Promise<Record<string, number>>;
+
 export function GetAllReadings():Promise<string>;
 
 export function GetClickCount():Promise<number>;
 
 export function GetCornerPoints():Promise<any>;
 
+export function GetCurrentFileIndex():Promise<number>;
+
 export function GetDescription():Promise<string>;
 
 export function GetImageDimensions():Promise<number|number>;
 
 export function GetMemoryStats():Promise<Record<string, any>>;
+
+export function GetTotalFiles():Promise<number>;
 
 export function GetTransformedImage():Promise<Array<number>>;
 
@@ -36,9 +42,13 @@ export function HandleClick(arg1:number):Promise<main.ClickResult>;
 
 export function IsAddonMode():Promise<boolean>;
 
+export function IsMultiFileMode():Promise<boolean>;
+
 export function IsPerspectiveMode():Promise<boolean>;
 
 export function IsRegularMode():Promise<boolean>;
+
+export function MoveToNextFile():Promise<boolean>;
 
 export function Reset():Promise<void>;
 
@@ -59,5 +69,7 @@ export function SetYMax(arg1:number):Promise<void>;
 export function StartAddonUsage():Promise<void>;
 
 export function StartMemoryMonitoring():Promise<void>;
+
+export function StartMultiFileProcessing(arg1:number):Promise<void>;
 
 export function StartRegularUsage():Promise<void>;

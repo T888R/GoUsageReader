@@ -7,10 +7,11 @@ toolchain go1.24.3
 require (
 	github.com/go-vgo/robotgo v1.0.1
 	github.com/robotn/gohook v0.42.3
-	github.com/wailsapp/wails/v2 v2.11.0
+	github.com/wailsapp/wails/v2 v2.12.0
 )
 
 require (
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/dblohm7/wingoes v0.0.0-20250822163801-6d8e6105c62d // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect

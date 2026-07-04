@@ -76,6 +76,25 @@ type App struct {
 	novA, novB int
 	decA, decB int
 
+	// Buffer values for multi-file aggregation
+	bufferJanuary   int
+	bufferFebruary  int
+	bufferMarch     int
+	bufferApril     int
+	bufferMay       int
+	bufferJune      int
+	bufferJuly      int
+	bufferAugust    int
+	bufferSeptember int
+	bufferOctober   int
+	bufferNovember  int
+	bufferDecember  int
+
+	// Multi-file processing state
+	isMultiFileMode  bool
+	currentFileIndex int
+	totalFiles       int
+
 	// Perspective transform data
 	cornerPoints    [4][2]float64 // 4 corners: top-left, top-right, bottom-right, bottom-left
 	transformedImg  []byte        // Base64 encoded transformed image
@@ -402,40 +421,88 @@ func (a *App) HandleClick(yPos int) (*ClickResult, error) {
 		a.lowerBound = yAxisLocation
 		reading = "Origin set"
 	case 2:
-		a.january = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferJanuary
+		}
+		a.january = strconv.Itoa(val)
 		reading = "January: " + a.january
 	case 3:
-		a.february = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferFebruary
+		}
+		a.february = strconv.Itoa(val)
 		reading = "February: " + a.february
 	case 4:
-		a.march = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferMarch
+		}
+		a.march = strconv.Itoa(val)
 		reading = "March: " + a.march
 	case 5:
-		a.april = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferApril
+		}
+		a.april = strconv.Itoa(val)
 		reading = "April: " + a.april
 	case 6:
-		a.may = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferMay
+		}
+		a.may = strconv.Itoa(val)
 		reading = "May: " + a.may
 	case 7:
-		a.june = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferJune
+		}
+		a.june = strconv.Itoa(val)
 		reading = "June: " + a.june
 	case 8:
-		a.july = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferJuly
+		}
+		a.july = strconv.Itoa(val)
 		reading = "July: " + a.july
 	case 9:
-		a.august = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferAugust
+		}
+		a.august = strconv.Itoa(val)
 		reading = "August: " + a.august
 	case 10:
-		a.september = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferSeptember
+		}
+		a.september = strconv.Itoa(val)
 		reading = "September: " + a.september
 	case 11:
-		a.october = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferOctober
+		}
+		a.october = strconv.Itoa(val)
 		reading = "October: " + a.october
 	case 12:
-		a.november = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferNovember
+		}
+		a.november = strconv.Itoa(val)
 		reading = "November: " + a.november
 	case 13:
-		a.december = a.calcGraph(yAxisLocation)
+		val := a.calcGraphInt(yAxisLocation)
+		if a.isMultiFileMode {
+			val += a.bufferDecember
+		}
+		a.december = strconv.Itoa(val)
 		reading = "December: " + a.december
 		// Disable regular usage mode to prevent overriding values
 		a.regularUsage = false
@@ -472,84 +539,132 @@ func (a *App) HandleAddonClick(yPos int) (*ClickResult, error) {
 		reading = "January consumption recorded"
 	case 3:
 		a.janB = a.calcAddonGraph(yAxisLocation)
-		a.january = a.calcNet(a.janA, a.janB)
+		netVal := a.calcNetInt(a.janA, a.janB)
+		if a.isMultiFileMode {
+			netVal += a.bufferJanuary
+		}
+		a.january = strconv.Itoa(netVal)
 		reading = "January: " + a.january
 	case 4:
 		a.febA = a.calcAddonGraph(yAxisLocation)
 		reading = "February consumption recorded"
 	case 5:
 		a.febB = a.calcAddonGraph(yAxisLocation)
-		a.february = a.calcNet(a.febA, a.febB)
+		netVal := a.calcNetInt(a.febA, a.febB)
+		if a.isMultiFileMode {
+			netVal += a.bufferFebruary
+		}
+		a.february = strconv.Itoa(netVal)
 		reading = "February: " + a.february
 	case 6:
 		a.marA = a.calcAddonGraph(yAxisLocation)
 		reading = "March consumption recorded"
 	case 7:
 		a.marB = a.calcAddonGraph(yAxisLocation)
-		a.march = a.calcNet(a.marA, a.marB)
+		netVal := a.calcNetInt(a.marA, a.marB)
+		if a.isMultiFileMode {
+			netVal += a.bufferMarch
+		}
+		a.march = strconv.Itoa(netVal)
 		reading = "March: " + a.march
 	case 8:
 		a.aprA = a.calcAddonGraph(yAxisLocation)
 		reading = "April consumption recorded"
 	case 9:
 		a.aprB = a.calcAddonGraph(yAxisLocation)
-		a.april = a.calcNet(a.aprA, a.aprB)
+		netVal := a.calcNetInt(a.aprA, a.aprB)
+		if a.isMultiFileMode {
+			netVal += a.bufferApril
+		}
+		a.april = strconv.Itoa(netVal)
 		reading = "April: " + a.april
 	case 10:
 		a.mayA = a.calcAddonGraph(yAxisLocation)
 		reading = "May consumption recorded"
 	case 11:
 		a.mayB = a.calcAddonGraph(yAxisLocation)
-		a.may = a.calcNet(a.mayA, a.mayB)
+		netVal := a.calcNetInt(a.mayA, a.mayB)
+		if a.isMultiFileMode {
+			netVal += a.bufferMay
+		}
+		a.may = strconv.Itoa(netVal)
 		reading = "May: " + a.may
 	case 12:
 		a.junA = a.calcAddonGraph(yAxisLocation)
 		reading = "June consumption recorded"
 	case 13:
 		a.junB = a.calcAddonGraph(yAxisLocation)
-		a.june = a.calcNet(a.junA, a.junB)
+		netVal := a.calcNetInt(a.junA, a.junB)
+		if a.isMultiFileMode {
+			netVal += a.bufferJune
+		}
+		a.june = strconv.Itoa(netVal)
 		reading = "June: " + a.june
 	case 14:
 		a.julA = a.calcAddonGraph(yAxisLocation)
 		reading = "July consumption recorded"
 	case 15:
 		a.julB = a.calcAddonGraph(yAxisLocation)
-		a.july = a.calcNet(a.julA, a.julB)
+		netVal := a.calcNetInt(a.julA, a.julB)
+		if a.isMultiFileMode {
+			netVal += a.bufferJuly
+		}
+		a.july = strconv.Itoa(netVal)
 		reading = "July: " + a.july
 	case 16:
 		a.augA = a.calcAddonGraph(yAxisLocation)
 		reading = "August consumption recorded"
 	case 17:
 		a.augB = a.calcAddonGraph(yAxisLocation)
-		a.august = a.calcNet(a.augA, a.augB)
+		netVal := a.calcNetInt(a.augA, a.augB)
+		if a.isMultiFileMode {
+			netVal += a.bufferAugust
+		}
+		a.august = strconv.Itoa(netVal)
 		reading = "August: " + a.august
 	case 18:
 		a.sepA = a.calcAddonGraph(yAxisLocation)
 		reading = "September consumption recorded"
 	case 19:
 		a.sepB = a.calcAddonGraph(yAxisLocation)
-		a.september = a.calcNet(a.sepA, a.sepB)
+		netVal := a.calcNetInt(a.sepA, a.sepB)
+		if a.isMultiFileMode {
+			netVal += a.bufferSeptember
+		}
+		a.september = strconv.Itoa(netVal)
 		reading = "September: " + a.september
 	case 20:
 		a.octA = a.calcAddonGraph(yAxisLocation)
 		reading = "October consumption recorded"
 	case 21:
 		a.octB = a.calcAddonGraph(yAxisLocation)
-		a.october = a.calcNet(a.octA, a.octB)
+		netVal := a.calcNetInt(a.octA, a.octB)
+		if a.isMultiFileMode {
+			netVal += a.bufferOctober
+		}
+		a.october = strconv.Itoa(netVal)
 		reading = "October: " + a.october
 	case 22:
 		a.novA = a.calcAddonGraph(yAxisLocation)
 		reading = "November consumption recorded"
 	case 23:
 		a.novB = a.calcAddonGraph(yAxisLocation)
-		a.november = a.calcNet(a.novA, a.novB)
+		netVal := a.calcNetInt(a.novA, a.novB)
+		if a.isMultiFileMode {
+			netVal += a.bufferNovember
+		}
+		a.november = strconv.Itoa(netVal)
 		reading = "November: " + a.november
 	case 24:
 		a.decA = a.calcAddonGraph(yAxisLocation)
 		reading = "December consumption recorded"
 	case 25:
 		a.decB = a.calcAddonGraph(yAxisLocation)
-		a.december = a.calcNet(a.decA, a.decB)
+		netVal := a.calcNetInt(a.decA, a.decB)
+		if a.isMultiFileMode {
+			netVal += a.bufferDecember
+		}
+		a.december = strconv.Itoa(netVal)
 		reading = "December: " + a.december
 		// Disable addon usage mode to prevent overriding values
 		a.addonUsage = false
@@ -565,6 +680,11 @@ func (a *App) HandleAddonClick(yPos int) (*ClickResult, error) {
 
 // calcGraph calculates usage value from pixel position
 func (a *App) calcGraph(ypos int) string {
+	return strconv.Itoa(a.calcGraphInt(ypos))
+}
+
+// calcGraphInt calculates usage value from pixel position and returns int
+func (a *App) calcGraphInt(ypos int) int {
 	var usage float32
 	var correctedUsage float32
 
@@ -579,7 +699,7 @@ func (a *App) calcGraph(ypos int) string {
 		correctedUsage = 0
 	}
 
-	return fmt.Sprint(int(correctedUsage))
+	return int(correctedUsage)
 }
 
 // calcAddonGraph calculates addon usage value
@@ -603,11 +723,16 @@ func (a *App) calcAddonGraph(ypos int) int {
 
 // calcNet calculates net value for addon mode
 func (a *App) calcNet(consumption, production int) string {
+	return strconv.Itoa(a.calcNetInt(consumption, production))
+}
+
+// calcNetInt calculates net value for addon mode and returns int
+func (a *App) calcNetInt(consumption, production int) int {
 	net := consumption - production
 	if net <= 1 {
 		net = 1
 	}
-	return fmt.Sprint(net)
+	return net
 }
 
 // autoPaste notifies the frontend that data is ready to be pasted
@@ -620,6 +745,11 @@ func (a *App) autoPaste() {
 
 // Reset resets the application state and frees memory
 func (a *App) Reset() {
+	a.resetInternal(true)
+}
+
+// resetInternal resets the application state with option to preserve buffer
+func (a *App) resetInternal(clearBuffer bool) {
 	a.clickCount = 0
 	a.upperBound = 0
 	a.lowerBound = 0
@@ -654,6 +784,25 @@ func (a *App) Reset() {
 	a.novA, a.novB = 0, 0
 	a.decA, a.decB = 0, 0
 
+	// Clear buffer values if requested
+	if clearBuffer {
+		a.bufferJanuary = 0
+		a.bufferFebruary = 0
+		a.bufferMarch = 0
+		a.bufferApril = 0
+		a.bufferMay = 0
+		a.bufferJune = 0
+		a.bufferJuly = 0
+		a.bufferAugust = 0
+		a.bufferSeptember = 0
+		a.bufferOctober = 0
+		a.bufferNovember = 0
+		a.bufferDecember = 0
+		a.isMultiFileMode = false
+		a.currentFileIndex = 0
+		a.totalFiles = 0
+	}
+
 	// Free large memory allocations
 	if a.transformedImg != nil {
 		a.transformedImg = nil
@@ -661,6 +810,126 @@ func (a *App) Reset() {
 
 	// Hint to GC to clean up freed memory
 	runtime.GC()
+}
+
+// StartMultiFileProcessing initializes multi-file mode with the total number of files
+func (a *App) StartMultiFileProcessing(totalFiles int) {
+	a.isMultiFileMode = true
+	a.totalFiles = totalFiles
+	a.currentFileIndex = 0
+
+	// Clear buffer values at the start of multi-file processing
+	a.bufferJanuary = 0
+	a.bufferFebruary = 0
+	a.bufferMarch = 0
+	a.bufferApril = 0
+	a.bufferMay = 0
+	a.bufferJune = 0
+	a.bufferJuly = 0
+	a.bufferAugust = 0
+	a.bufferSeptember = 0
+	a.bufferOctober = 0
+	a.bufferNovember = 0
+	a.bufferDecember = 0
+}
+
+// IsMultiFileMode returns true if the app is in multi-file processing mode
+func (a *App) IsMultiFileMode() bool {
+	return a.isMultiFileMode
+}
+
+// GetCurrentFileIndex returns the current file index in multi-file mode
+func (a *App) GetCurrentFileIndex() int {
+	return a.currentFileIndex
+}
+
+// GetTotalFiles returns the total number of files in multi-file mode
+func (a *App) GetTotalFiles() int {
+	return a.totalFiles
+}
+
+// MoveToNextFile advances to the next file in multi-file mode and aggregates values
+// Returns true if there are more files to process, false if all files are done
+func (a *App) MoveToNextFile() bool {
+	if !a.isMultiFileMode {
+		return false
+	}
+
+	// Aggregate current values into buffer
+	jan, _ := strconv.Atoi(a.january)
+	feb, _ := strconv.Atoi(a.february)
+	mar, _ := strconv.Atoi(a.march)
+	apr, _ := strconv.Atoi(a.april)
+	may, _ := strconv.Atoi(a.may)
+	jun, _ := strconv.Atoi(a.june)
+	jul, _ := strconv.Atoi(a.july)
+	aug, _ := strconv.Atoi(a.august)
+	sep, _ := strconv.Atoi(a.september)
+	oct, _ := strconv.Atoi(a.october)
+	nov, _ := strconv.Atoi(a.november)
+	dec, _ := strconv.Atoi(a.december)
+
+	a.bufferJanuary += jan
+	a.bufferFebruary += feb
+	a.bufferMarch += mar
+	a.bufferApril += apr
+	a.bufferMay += may
+	a.bufferJune += jun
+	a.bufferJuly += jul
+	a.bufferAugust += aug
+	a.bufferSeptember += sep
+	a.bufferOctober += oct
+	a.bufferNovember += nov
+	a.bufferDecember += dec
+
+	a.currentFileIndex++
+
+	// Check if we've processed all files
+	if a.currentFileIndex >= a.totalFiles {
+		// Set final aggregated values
+		a.january = strconv.Itoa(a.bufferJanuary)
+		a.february = strconv.Itoa(a.bufferFebruary)
+		a.march = strconv.Itoa(a.bufferMarch)
+		a.april = strconv.Itoa(a.bufferApril)
+		a.may = strconv.Itoa(a.bufferMay)
+		a.june = strconv.Itoa(a.bufferJune)
+		a.july = strconv.Itoa(a.bufferJuly)
+		a.august = strconv.Itoa(a.bufferAugust)
+		a.september = strconv.Itoa(a.bufferSeptember)
+		a.october = strconv.Itoa(a.bufferOctober)
+		a.november = strconv.Itoa(a.bufferNovember)
+		a.december = strconv.Itoa(a.bufferDecember)
+
+		// Clear buffer and multi-file state
+		a.isMultiFileMode = false
+		a.currentFileIndex = 0
+		a.totalFiles = 0
+
+		return false
+	}
+
+	// Reset state for next file (preserve buffer)
+	a.resetInternal(false)
+
+	return true
+}
+
+// GetAggregatedValues returns the current aggregated buffer values
+func (a *App) GetAggregatedValues() map[string]int {
+	return map[string]int{
+		"january":   a.bufferJanuary,
+		"february":  a.bufferFebruary,
+		"march":     a.bufferMarch,
+		"april":     a.bufferApril,
+		"may":       a.bufferMay,
+		"june":      a.bufferJune,
+		"july":      a.bufferJuly,
+		"august":    a.bufferAugust,
+		"september": a.bufferSeptember,
+		"october":   a.bufferOctober,
+		"november":  a.bufferNovember,
+		"december":  a.bufferDecember,
+	}
 }
 
 // GetAllReadings returns all month readings as a formatted string
