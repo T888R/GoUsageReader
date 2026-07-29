@@ -17,12 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-vgo/robotgo"
-	hook "github.com/robotn/gohook"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -38,6 +35,7 @@ type ClickResult struct {
 // App struct
 type App struct {
 	ctx          context.Context
+	platform     platform
 	windowHeight int
 	maxYRes      int
 	clickCount   int
@@ -116,6 +114,7 @@ func NewApp() *App {
 // OnStartup is called when the app starts
 func (a *App) OnStartup(ctx context.Context) {
 	a.ctx = ctx
+	a.platform = newPlatform()
 	a.hotkeyStopChan = make(chan struct{})
 	// Start global hotkey listener in background
 	go a.startGlobalHotkeyListener()
@@ -207,23 +206,10 @@ func (a *App) StartMemoryMonitoring() {
 	}()
 }
 
-// startGlobalHotkeyListener registers Alt+V globally and listens for the hotkey
+// startGlobalHotkeyListener registers Alt+V globally and listens for the hotkey.
+// Platform-specific registration is handled by the platform implementation.
 func (a *App) startGlobalHotkeyListener() {
-	// Register 'v' key as global hotkey
-	// Using KeyUp so it only triggers once when key is released
-	hook.Register(hook.KeyUp, []string{"v"}, func(e hook.Event) {
-		a.typeMonthlyValues()
-	})
-	s := hook.Start()
-
-	// Listen for stop signal or hook events
-	go func() {
-		<-hook.Process(s)
-	}()
-
-	// Wait for stop signal
-	<-a.hotkeyStopChan
-	hook.End()
+	a.platform.startHotkeyListener(a, a.hotkeyStopChan)
 }
 
 // areAllValuesFilled checks if all 12 monthly values have been set
@@ -234,41 +220,20 @@ func (a *App) areAllValuesFilled() bool {
 		a.october != "" && a.november != "" && a.december != ""
 }
 
-// typeMonthlyValues types all monthly values with tabs between them.
-// If a month's value is 0, a backspace and tab are sent instead.
-// Only works if all values are filled and hasn't been pasted yet.
+// typeMonthlyValues types all monthly values into the focused application.
+// Platform-specific typing behavior (including zero-value handling) is
+// handled by the platform implementation.
 func (a *App) typeMonthlyValues() {
-	// Check if values are ready and not already pasted
-	if !a.areAllValuesFilled() {
-		return
-	}
-	if a.hasPasted {
+	if !a.areAllValuesFilled() || a.hasPasted {
 		return
 	}
 
-	// Mark as pasted to prevent double-triggering
 	a.hasPasted = true
 
-	// Delete the 'v' character that was typed when the hotkey was pressed
-	robotgo.KeyTap("backspace")
-	time.Sleep(10 * time.Millisecond)
-
-	// Type all values with tabs in between
 	values := []string{a.january, a.february, a.march, a.april, a.may, a.june,
 		a.july, a.august, a.september, a.october, a.november, a.december}
 
-	for i, value := range values {
-		if value == "0" {
-			robotgo.KeyTap("backspace")
-			robotgo.KeyTap("tab")
-		} else {
-			robotgo.TypeStr(value)
-			if i < len(values)-1 {
-				robotgo.KeyTap("tab")
-			}
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	a.platform.typeValues(values)
 
 	// Reset after typing is complete
 	go func() {
@@ -279,7 +244,7 @@ func (a *App) typeMonthlyValues() {
 // SetWindowHeight sets the window height and calculates maxYRes from it
 func (a *App) SetWindowHeight(height int) {
 	a.windowHeight = height
-	a.maxYRes = height
+	a.maxYRes = a.platform.referenceHeight(height)
 }
 
 // GetWindowHeight returns the current window height
@@ -1484,7 +1449,7 @@ func (a *App) ApplyCrop(imageDataBase64 string, x, y, cropWidth, cropHeight int)
 func main() {
 	app := NewApp()
 
-	err := wails.Run(&options.App{
+	opts := &options.App{
 		Title:     "Usage Reader",
 		Width:     800,
 		Height:    700,
@@ -1496,13 +1461,13 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
 		OnStartup:        app.OnStartup,
 		OnShutdown:       app.OnShutdown,
-		Linux: &linux.Options{
-			WebviewGpuPolicy: linux.WebviewGpuPolicyAlways,
-		},
 		Bind: []interface{}{
 			app,
 		},
-	})
+	}
+	configurePlatformOptions(opts)
+
+	err := wails.Run(opts)
 
 	if err != nil {
 		println("Error:", err.Error())

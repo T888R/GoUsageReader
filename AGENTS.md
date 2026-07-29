@@ -57,6 +57,24 @@ Error: Wails applications will not build without the correct build tags.
 
 For production builds, use: `go build -tags desktop,production -o UsageReader .`
 
+### Platform-Specific Builds
+
+Platform-specific code is isolated in files tagged with `//go:build linux` or
+`//go:build windows`. Common Wails options and the platform interface live in
+`main.go` and `platform.go`.
+
+```bash
+# Linux (default on Linux hosts)
+go build -tags desktop,production -o UsageReader .
+
+# Windows cross-compile from Linux (requires a Windows C toolchain / CGO)
+GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build -tags desktop,production -o UsageReader.exe .
+```
+
+The `robotgo` and `gohook` dependencies used for hotkeys and automated typing
+require CGO, so Windows builds must be produced on Windows or with a suitable
+MinGW-w64 cross-compiler.
+
 ## Code Style Guidelines
 
 ### Go Code
@@ -86,6 +104,9 @@ For production builds, use: `go build -tags desktop,production -o UsageReader .`
 ```
 /
 ├── main.go              # Main Go backend with Wails bindings
+├── platform.go          # Platform interface for OS-specific behavior
+├── platform_linux.go    # Linux implementation (build tag: linux)
+├── platform_windows.go  # Windows implementation (build tag: windows)
 ├── wails.json           # Wails configuration
 ├── go.mod/go.sum        # Go dependencies
 ├── frontend/
@@ -177,4 +198,5 @@ golangci-lint run
 - Application uses parallel goroutines for image processing (32-row chunks)
 - Perspective transform uses homography matrix calculations
 - No database - state is in-memory only
-- Cross-platform target: Linux (primary), Windows planned
+- Cross-platform target: Linux (primary), Windows supported via build tags
+- Platform-specific behavior (screen reference height, global hotkeys, automated typing) is isolated in `platform_linux.go` and `platform_windows.go`
