@@ -667,6 +667,17 @@ body.crop-mode {
     color: var(--ctp-base);
 }
 
+#cropPreviewBack {
+    background: var(--ctp-overlay0);
+    color: var(--ctp-base);
+}
+
+#cropPreviewBack:hover {
+    background: var(--ctp-overlay1);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
 /* Memory Status Display */
 .memory-status {
     display: flex;

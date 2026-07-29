@@ -2373,7 +2373,7 @@ async function applyCropImpl() {
 // ============================================
 
 // Crop preview modal state
-let cropPreviewModal, cropPreviewImage, cropPreviewSelection, cropPreviewApplyBtn, cropPreviewSkipBtn;
+let cropPreviewModal, cropPreviewImage, cropPreviewSelection, cropPreviewApplyBtn, cropPreviewSkipBtn, cropPreviewBackBtn;
 let cropPreviewSelectionData = null;
 let isDrawingCropPreview = false;
 let cropPreviewStart = null;
@@ -2389,6 +2389,7 @@ function initCropPreviewElements() {
     cropPreviewSelection = document.getElementById('cropPreviewSelection');
     cropPreviewApplyBtn = document.getElementById('cropPreviewApply');
     cropPreviewSkipBtn = document.getElementById('cropPreviewSkip');
+    cropPreviewBackBtn = document.getElementById('cropPreviewBack');
     rotateLeftBtn = document.getElementById('rotateLeftBtn');
     rotateRightBtn = document.getElementById('rotateRightBtn');
     rotationIndicator = document.getElementById('rotationIndicator');
@@ -2399,6 +2400,10 @@ function initCropPreviewElements() {
 
     if (cropPreviewSkipBtn) {
         cropPreviewSkipBtn.addEventListener('click', skipCropPreview);
+    }
+
+    if (cropPreviewBackBtn) {
+        cropPreviewBackBtn.addEventListener('click', backFromCropPreview);
     }
 
     // Rotation button handlers
@@ -2961,6 +2966,36 @@ function skipCropPreview() {
         showNotification('Error loading image');
     };
     img.src = imageDataUrl;
+}
+
+// Go back from crop preview to allow importing a different image
+async function backFromCropPreview() {
+    // Hide the crop preview modal and clean up its state
+    hideCropPreviewModal();
+
+    // Reset file input so the same or a different image can be selected again
+    if (fileInput) {
+        fileInput.value = '';
+    }
+
+    // Clear any image data that may have been loaded
+    cleanupImageData();
+
+    // Reset rotation preview state
+    cropPreviewRotationAngle = 0;
+
+    // Reset any multi-file processing state and backend state
+    appState.multiFileQueue = [];
+    appState.currentFileIndex = 0;
+    appState.isProcessingMultiFile = false;
+    appState.isWaitingForNextFile = false;
+    hideMultiFileProgress();
+
+    if (isGoAvailable()) {
+        await callGo("Reset");
+    }
+
+    showNotification('Image import cancelled. Select a different image.');
 }
 
 // Hide crop preview modal
