@@ -235,7 +235,7 @@ func (a *App) areAllValuesFilled() bool {
 }
 
 // typeMonthlyValues types all monthly values with tabs between them.
-// If a month's value is 0, it is skipped and a tab is sent instead.
+// If a month's value is 0, a backspace and tab are sent instead.
 // Only works if all values are filled and hasn't been pasted yet.
 func (a *App) typeMonthlyValues() {
 	// Check if values are ready and not already pasted
@@ -259,16 +259,15 @@ func (a *App) typeMonthlyValues() {
 
 	for i, value := range values {
 		if value == "0" {
-			// Skip the zero value and move to the next field
+			robotgo.KeyTap("backspace")
 			robotgo.KeyTap("tab")
 		} else {
 			robotgo.TypeStr(value)
-			// Add tab between values (not after the last one)
 			if i < len(values)-1 {
 				robotgo.KeyTap("tab")
 			}
 		}
-		time.Sleep(10 * time.Millisecond) // 10ms delay as requested
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Reset after typing is complete

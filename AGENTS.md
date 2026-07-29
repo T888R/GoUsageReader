@@ -14,13 +14,14 @@ wails dev
 wails build
 
 # Build with verbose output
-wails build -v
+wails build -v 2
 ```
 
 ### Go Commands
 ```bash
 # Build Go binary only (no frontend)
-go build -o UsageReader .
+# Wails requires the desktop and production build tags to run
+go build -tags desktop,production -o UsageReader .
 
 # Run Go tests
 go test ./...
@@ -42,6 +43,19 @@ cd frontend
 # No package.json - vanilla JS/CSS only
 # Frontend is served from frontend/dist/ in production
 ```
+
+### Build Tags
+
+Wails injects the required build tags (`desktop` and `production` for production,
+`desktop` and `dev` for development) when you use `wails build` or `wails dev`.
+If you build directly with `go build`, you must pass those tags yourself, otherwise
+the resulting binary will print the error:
+
+```
+Error: Wails applications will not build without the correct build tags.
+```
+
+For production builds, use: `go build -tags desktop,production -o UsageReader .`
 
 ## Code Style Guidelines
 
