@@ -70,16 +70,38 @@ func (p *linuxPlatform) startHotkeyListener(app *App, stopChan <-chan struct{}) 
 		log.Println("linux hotkey: could not find keycode for 'v'")
 		return
 	}
+	log.Printf("linux hotkey: using keycode %d on root window %d", keycode, root)
 
-	// Grab the V key on the root window with any modifier combination.
-	if err := xproto.GrabKeyChecked(X, false, root, xproto.ModMaskAny, keycode,
-		xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
-		log.Printf("linux hotkey: GrabKey failed: %v", err)
+	// Grab the V key on every root window with any modifier combination.
+	// Some desktop environments or multi-screen setups may reject a grab on
+	// one screen but accept another.
+	roots := make([]xproto.Window, 0, len(setup.Roots))
+	for _, s := range setup.Roots {
+		roots = append(roots, s.Root)
+	}
+	if len(roots) == 0 {
+		log.Println("linux hotkey: no root windows available")
+		return
+	}
+
+	grabbedRoots := make([]xproto.Window, 0, len(roots))
+	for _, r := range roots {
+		if err := xproto.GrabKeyChecked(X, false, r, xproto.ModMaskAny, keycode,
+			xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
+			log.Printf("linux hotkey: GrabKey failed on root %d: %v", r, err)
+			continue
+		}
+		grabbedRoots = append(grabbedRoots, r)
+	}
+	if len(grabbedRoots) == 0 {
+		log.Println("linux hotkey: could not grab V key on any root window")
 		return
 	}
 
 	defer func() {
-		_ = xproto.UngrabKeyChecked(X, keycode, root, xproto.ModMaskAny).Check()
+		for _, r := range grabbedRoots {
+			_ = xproto.UngrabKeyChecked(X, keycode, r, xproto.ModMaskAny).Check()
+		}
 	}()
 
 	eventChan := make(chan xgb.Event, 16)
@@ -137,8 +159,9 @@ func (p *linuxPlatform) typeValues(values []string) error {
 	}
 
 	// Give the hotkey's own keystroke a moment to reach the target window
-	// before we try to clear it.
-	time.Sleep(50 * time.Millisecond)
+	// before we try to clear it. Some applications (e.g. browsers) buffer
+	// input events, so a longer pause is safer than a short one.
+	time.Sleep(150 * time.Millisecond)
 
 	keys := []string{"BackSpace"}
 
@@ -163,7 +186,10 @@ func (p *linuxPlatform) typeValues(values []string) error {
 		return nil
 	}
 
-	cmd := exec.Command("xdotool", append([]string{"key"}, keys...)...)
+	// Use a longer inter-key delay than the xdotool default so the target
+	// application has time to process each keystroke.
+	args := append([]string{"key", "--delay", "50"}, keys...)
+	cmd := exec.Command("xdotool", args...)
 	if err := cmd.Run(); err != nil {
 		log.Printf("linux paste: xdotool failed: %v", err)
 		return err
