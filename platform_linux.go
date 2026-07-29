@@ -3,16 +3,20 @@
 package main
 
 import (
-	"time"
+	"os/exec"
 
-	"github.com/go-vgo/robotgo"
-	hook "github.com/robotn/gohook"
+	"github.com/jezek/xgb"
+	"github.com/jezek/xgb/xproto"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 )
 
-// linuxPlatform implements platform for Linux builds.
-type linuxPlatform struct{}
+// linuxPlatform implements platform for Linux builds without relying on
+// the CGO-heavy robotgo/gohook libraries, which have been observed to cause
+// undefined behavior and crashes.
+type linuxPlatform struct {
+	xConn *xgb.Conn
+}
 
 // Compile-time check that linuxPlatform implements platform.
 var _ platform = (*linuxPlatform)(nil)
@@ -28,42 +32,121 @@ func (p *linuxPlatform) referenceHeight(windowHeight int) int {
 	return windowHeight
 }
 
-// startHotkeyListener registers the global V key release and triggers the
-// paste handler when it is pressed.
+// startHotkeyListener grabs the V key on the root window and listens for its
+// release. This avoids the CGO-dependent gohook library.
 func (p *linuxPlatform) startHotkeyListener(app *App, stopChan <-chan struct{}) {
-	hook.Register(hook.KeyUp, []string{"v"}, func(e hook.Event) {
-		app.typeMonthlyValues()
-	})
-	s := hook.Start()
-
-	go func() {
-		<-hook.Process(s)
+	X, err := xgb.NewConn()
+	if err != nil {
+		return
+	}
+	p.xConn = X
+	defer func() {
+		p.xConn = nil
+		X.Close()
 	}()
 
-	<-stopChan
-	hook.End()
+	setup := xproto.Setup(X)
+	if setup == nil || len(setup.Roots) == 0 {
+		return
+	}
+	root := setup.Roots[0].Root
+
+	minKC := setup.MinKeycode
+	maxKC := setup.MaxKeycode
+	count := byte(maxKC - minKC + 1)
+
+	mapping, err := xproto.GetKeyboardMapping(X, minKC, count).Reply()
+	if err != nil {
+		return
+	}
+
+	keycode := findLinuxKeycode(mapping, minKC, count, xproto.Keysym(0x76)) // 'v'
+	if keycode == 0 {
+		return
+	}
+
+	// Grab the V key on the root window with any modifier combination.
+	_ = xproto.GrabKeyChecked(X, false, root, xproto.ModMaskAny, keycode,
+		xproto.GrabModeAsync, xproto.GrabModeAsync).Check()
+
+	defer func() {
+		_ = xproto.UngrabKeyChecked(X, keycode, root, xproto.ModMaskAny).Check()
+	}()
+
+	eventChan := make(chan xgb.Event, 16)
+	eventErr := make(chan error, 1)
+	go func() {
+		for {
+			ev, err := X.WaitForEvent()
+			if err != nil {
+				eventErr <- err
+				return
+			}
+			eventChan <- ev
+		}
+	}()
+
+	for {
+		select {
+		case <-stopChan:
+			return
+		case <-eventErr:
+			return
+		case ev := <-eventChan:
+			if keyEvent, ok := ev.(xproto.KeyReleaseEvent); ok {
+				if keyEvent.Detail == keycode {
+					go app.typeMonthlyValues()
+				}
+			}
+		}
+	}
 }
 
-// typeValues types the provided values into the focused application, sending
-// backspace+tab for zero values and tab between values.
+// findLinuxKeycode searches the X keyboard mapping for the keycode that
+// produces the requested keysym.
+func findLinuxKeycode(mapping *xproto.GetKeyboardMappingReply, minKeycode xproto.Keycode, count byte, keysym xproto.Keysym) byte {
+	if mapping.KeysymsPerKeycode == 0 {
+		return 0
+	}
+	for i := byte(0); i < count; i++ {
+		for j := 0; j < int(mapping.KeysymsPerKeycode); j++ {
+			idx := int(i)*int(mapping.KeysymsPerKeycode) + j
+			if mapping.Keysyms[idx] == keysym {
+				return byte(minKeycode) + i
+			}
+		}
+	}
+	return 0
+}
+
+// typeValues types the provided values into the focused application using
+// xdotool. It sends backspace+tab for zero values and tab between values.
 func (p *linuxPlatform) typeValues(values []string) error {
-	robotgo.KeyTap("backspace")
-	time.Sleep(10 * time.Millisecond)
+	keys := []string{"BackSpace"}
 
 	for i, value := range values {
 		if value == "0" {
-			robotgo.KeyTap("backspace")
-			robotgo.KeyTap("tab")
+			keys = append(keys, "BackSpace", "Tab")
 		} else {
-			robotgo.TypeStr(value)
+			for _, r := range value {
+				if r >= '0' && r <= '9' {
+					keys = append(keys, string(r))
+				} else if r == '-' {
+					keys = append(keys, "minus")
+				}
+			}
 			if i < len(values)-1 {
-				robotgo.KeyTap("tab")
+				keys = append(keys, "Tab")
 			}
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 
-	return nil
+	if len(keys) == 0 {
+		return nil
+	}
+
+	cmd := exec.Command("xdotool", append([]string{"key"}, keys...)...)
+	return cmd.Run()
 }
 
 // configurePlatformOptions applies Linux-specific Wails options.

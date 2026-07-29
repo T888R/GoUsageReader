@@ -71,9 +71,13 @@ go build -tags desktop,production -o UsageReader .
 GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build -tags desktop,production -o UsageReader.exe .
 ```
 
-The `robotgo` and `gohook` dependencies used for hotkeys and automated typing
-require CGO, so Windows builds must be produced on Windows or with a suitable
-MinGW-w64 cross-compiler.
+Hotkeys and automated typing are implemented with native platform APIs:
+
+- **Windows**: `user32.dll` (`SetWindowsHookEx`, `SendInput`, `EnumDisplayMonitors`)
+  via `syscall` and `golang.org/x/sys/windows`. No CGO is required for the
+  platform-specific code.
+- **Linux**: `github.com/jezek/xgb` for the global X11 hotkey and `xdotool`
+  (external dependency) for automated typing.
 
 ## Code Style Guidelines
 
@@ -200,3 +204,4 @@ golangci-lint run
 - No database - state is in-memory only
 - Cross-platform target: Linux (primary), Windows supported via build tags
 - Platform-specific behavior (screen reference height, global hotkeys, automated typing) is isolated in `platform_linux.go` and `platform_windows.go`
+- The application no longer uses `robotgo` or `gohook`; those CGO-heavy libraries were replaced with the native Windows and X11/xdotool approaches above.
