@@ -3,7 +3,9 @@
 package main
 
 import (
+	"log"
 	"os/exec"
+	"time"
 
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
@@ -37,6 +39,7 @@ func (p *linuxPlatform) referenceHeight(windowHeight int) int {
 func (p *linuxPlatform) startHotkeyListener(app *App, stopChan <-chan struct{}) {
 	X, err := xgb.NewConn()
 	if err != nil {
+		log.Printf("linux hotkey: X11 connection failed: %v", err)
 		return
 	}
 	p.xConn = X
@@ -47,6 +50,7 @@ func (p *linuxPlatform) startHotkeyListener(app *App, stopChan <-chan struct{}) 
 
 	setup := xproto.Setup(X)
 	if setup == nil || len(setup.Roots) == 0 {
+		log.Println("linux hotkey: X11 setup has no screens")
 		return
 	}
 	root := setup.Roots[0].Root
@@ -57,17 +61,22 @@ func (p *linuxPlatform) startHotkeyListener(app *App, stopChan <-chan struct{}) 
 
 	mapping, err := xproto.GetKeyboardMapping(X, minKC, count).Reply()
 	if err != nil {
+		log.Printf("linux hotkey: keyboard mapping failed: %v", err)
 		return
 	}
 
 	keycode := findLinuxKeycode(mapping, minKC, count, xproto.Keysym(0x76)) // 'v'
 	if keycode == 0 {
+		log.Println("linux hotkey: could not find keycode for 'v'")
 		return
 	}
 
 	// Grab the V key on the root window with any modifier combination.
-	_ = xproto.GrabKeyChecked(X, false, root, xproto.ModMaskAny, keycode,
-		xproto.GrabModeAsync, xproto.GrabModeAsync).Check()
+	if err := xproto.GrabKeyChecked(X, false, root, xproto.ModMaskAny, keycode,
+		xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
+		log.Printf("linux hotkey: GrabKey failed: %v", err)
+		return
+	}
 
 	defer func() {
 		_ = xproto.UngrabKeyChecked(X, keycode, root, xproto.ModMaskAny).Check()
@@ -104,7 +113,7 @@ func (p *linuxPlatform) startHotkeyListener(app *App, stopChan <-chan struct{}) 
 
 // findLinuxKeycode searches the X keyboard mapping for the keycode that
 // produces the requested keysym.
-func findLinuxKeycode(mapping *xproto.GetKeyboardMappingReply, minKeycode xproto.Keycode, count byte, keysym xproto.Keysym) byte {
+func findLinuxKeycode(mapping *xproto.GetKeyboardMappingReply, minKeycode xproto.Keycode, count byte, keysym xproto.Keysym) xproto.Keycode {
 	if mapping.KeysymsPerKeycode == 0 {
 		return 0
 	}
@@ -112,7 +121,7 @@ func findLinuxKeycode(mapping *xproto.GetKeyboardMappingReply, minKeycode xproto
 		for j := 0; j < int(mapping.KeysymsPerKeycode); j++ {
 			idx := int(i)*int(mapping.KeysymsPerKeycode) + j
 			if mapping.Keysyms[idx] == keysym {
-				return byte(minKeycode) + i
+				return minKeycode + xproto.Keycode(i)
 			}
 		}
 	}
@@ -122,6 +131,15 @@ func findLinuxKeycode(mapping *xproto.GetKeyboardMappingReply, minKeycode xproto
 // typeValues types the provided values into the focused application using
 // xdotool. It sends backspace+tab for zero values and tab between values.
 func (p *linuxPlatform) typeValues(values []string) error {
+	if err := linuxXdotoolCheck(); err != nil {
+		log.Printf("linux paste: xdotool not found in PATH: %v", err)
+		return err
+	}
+
+	// Give the hotkey's own keystroke a moment to reach the target window
+	// before we try to clear it.
+	time.Sleep(50 * time.Millisecond)
+
 	keys := []string{"BackSpace"}
 
 	for i, value := range values {
@@ -146,7 +164,24 @@ func (p *linuxPlatform) typeValues(values []string) error {
 	}
 
 	cmd := exec.Command("xdotool", append([]string{"key"}, keys...)...)
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		log.Printf("linux paste: xdotool failed: %v", err)
+		return err
+	}
+
+	// Small pause after the paste so the target application can process the
+	// keystrokes before the next operation (e.g., a new image import).
+	time.Sleep(50 * time.Millisecond)
+	return nil
+}
+
+// linuxXdotoolCheck returns an error if xdotool is not available in PATH.
+func linuxXdotoolCheck() error {
+	_, err := exec.LookPath("xdotool")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // configurePlatformOptions applies Linux-specific Wails options.
